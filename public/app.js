@@ -200,13 +200,37 @@
     }
   }
 
+  function renderItemsIntoCard(card, items) {
+    let lastHeaderLevel = 1;
+    items.forEach((entry) => {
+      if (entry.type === "header") {
+        lastHeaderLevel = entry.level || 2;
+        const header = document.createElement("div");
+        header.className = "overview-header-item" + (lastHeaderLevel >= 3 ? " sub-header" : "");
+        header.textContent = entry.text;
+        card.appendChild(header);
+      } else {
+        const row = document.createElement("div");
+        row.className = "overview-item" + (lastHeaderLevel >= 3 ? " sub-item" : "");
+        const circle = document.createElement("div");
+        circle.className = "circle";
+        const text = document.createElement("span");
+        text.className = "item-text";
+        text.textContent = entry.text;
+        row.appendChild(circle);
+        row.appendChild(text);
+        card.appendChild(row);
+      }
+    });
+  }
+
   function renderCategory(cat) {
     activeCategory = cat;
     // Update active tab
     categoryTabs.forEach((t) => t.classList.toggle("active", t.dataset.cat === cat));
 
     // Clear and render
-    overviewContent.querySelectorAll(".overview-list, .empty").forEach((el) => el.remove());
+    overviewContent.querySelectorAll(".overview-card, .empty").forEach((el) => el.remove());
 
     if (cat === "alles") {
       renderAllCategories();
@@ -214,8 +238,9 @@
     }
 
     const items = overviewData[cat] || [];
+    const hasRealItems = items.some((e) => e.type !== "header");
 
-    if (items.length === 0) {
+    if (items.length === 0 || !hasRealItems) {
       const empty = document.createElement("div");
       empty.className = "empty";
       empty.textContent = "Geen items";
@@ -223,22 +248,10 @@
       return;
     }
 
-    const ul = document.createElement("ul");
-    ul.className = "overview-list";
-
-    items.forEach((entry) => {
-      const li = document.createElement("li");
-      if (entry.type === "header") {
-        li.className = "header";
-        li.textContent = entry.text;
-      } else {
-        li.className = "item";
-        li.textContent = entry.text;
-      }
-      ul.appendChild(li);
-    });
-
-    overviewContent.appendChild(ul);
+    const card = document.createElement("div");
+    card.className = "overview-card";
+    renderItemsIntoCard(card, items);
+    overviewContent.appendChild(card);
   }
 
   function renderAllCategories() {
@@ -251,31 +264,16 @@
       if (items.length === 0 || !hasRealItems) return;
       hasItems = true;
 
-      const section = document.createElement("div");
-      section.className = "all-section";
+      const card = document.createElement("div");
+      card.className = "overview-card";
 
-      const title = document.createElement("h2");
-      title.className = "section-title";
+      const title = document.createElement("div");
+      title.className = "overview-card-title";
       title.textContent = categoryLabels[cat] || cat;
-      section.appendChild(title);
+      card.appendChild(title);
 
-      const ul = document.createElement("ul");
-      ul.className = "overview-list";
-
-      items.forEach((entry) => {
-        const li = document.createElement("li");
-        if (entry.type === "header") {
-          li.className = "header";
-          li.textContent = entry.text;
-        } else {
-          li.className = "item";
-          li.textContent = entry.text;
-        }
-        ul.appendChild(li);
-      });
-
-      section.appendChild(ul);
-      overviewContent.appendChild(section);
+      renderItemsIntoCard(card, items);
+      overviewContent.appendChild(card);
     });
 
     if (!hasItems) {
