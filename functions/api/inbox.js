@@ -75,12 +75,21 @@ export async function onRequestPost(context) {
     });
     const newLine = `- ${item.trim()} *(${timestamp})*`;
 
-    // Append after the header (first line)
+    // Insert after the --- separator
     const lines = content.split("\n");
-    let insertIndex = 1;
-    // Skip header and any empty lines after it
-    while (insertIndex < lines.length && lines[insertIndex].trim() === "") {
-      insertIndex++;
+    let insertIndex = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trim() === "---") {
+        insertIndex = i + 1;
+        break;
+      }
+    }
+    // If no separator found, append after header
+    if (insertIndex === -1) {
+      insertIndex = 1;
+      while (insertIndex < lines.length && lines[insertIndex].trim() === "") {
+        insertIndex++;
+      }
     }
     lines.splice(insertIndex, 0, newLine);
 

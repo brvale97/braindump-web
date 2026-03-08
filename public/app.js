@@ -97,6 +97,7 @@
     appScreen.classList.add("hidden");
     pinInput.value = "";
     pinInput.focus();
+    overviewData = {};
   }
 
   function showApp() {
@@ -246,7 +247,8 @@
 
     order.forEach((cat) => {
       const items = overviewData[cat] || [];
-      if (items.length === 0) return;
+      const hasRealItems = items.some((e) => e.type !== "header");
+      if (items.length === 0 || !hasRealItems) return;
       hasItems = true;
 
       const section = document.createElement("div");
