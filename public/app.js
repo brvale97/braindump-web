@@ -529,6 +529,45 @@
     return div.innerHTML;
   }
 
+  // --- PWA Install ---
+
+  let deferredPrompt = null;
+  const installBanner = document.getElementById("install-banner");
+  const installBtn = document.getElementById("install-btn");
+  const installDismiss = document.getElementById("install-dismiss");
+
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    // Don't show if user dismissed before
+    if (!sessionStorage.getItem("install_dismissed")) {
+      installBanner.classList.remove("hidden");
+    }
+  });
+
+  installBtn.addEventListener("click", async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const result = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    installBanner.classList.add("hidden");
+  });
+
+  installDismiss.addEventListener("click", () => {
+    installBanner.classList.add("hidden");
+    sessionStorage.setItem("install_dismissed", "1");
+  });
+
+  window.addEventListener("appinstalled", () => {
+    installBanner.classList.add("hidden");
+    deferredPrompt = null;
+  });
+
+  // Register service worker
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+
   // --- Init ---
 
   if (getToken()) {
