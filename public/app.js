@@ -22,6 +22,7 @@
   let overviewData = {};
   let activeCategory = "alles";
   let pendingFile = null;
+  let sortNewest = false;
 
   const categoryLabels = {
     werk: "GEP",
@@ -143,6 +144,25 @@
     inboxFeed.scrollTop = inboxFeed.scrollHeight;
   }
 
+  const copySvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+
+  function makeCopyBtn(textToCopy) {
+    const btn = document.createElement("button");
+    btn.className = "copy-btn";
+    btn.innerHTML = copySvg;
+    btn.title = "Kopiëren";
+    btn.addEventListener("click", () => {
+      navigator.clipboard.writeText(textToCopy);
+      btn.innerHTML = "&#10003;";
+      btn.classList.add("copied");
+      setTimeout(() => {
+        btn.innerHTML = copySvg;
+        btn.classList.remove("copied");
+      }, 1500);
+    });
+    return btn;
+  }
+
   function appendInboxItem(text) {
     const emptyEl = inboxFeed.querySelector(".empty");
     if (emptyEl) emptyEl.remove();
@@ -158,17 +178,23 @@
     const imgExts = /\.(jpe?g|png|gif|webp|svg)$/i;
     const linkMatch = mainText.match(/^\[(.+?)\]\((.+?)\)$/);
 
+    const content = document.createElement("div");
+    content.className = "inbox-item-content";
+
     if (linkMatch && imgExts.test(linkMatch[1])) {
       const rawUrl = linkMatch[2].replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/");
-      div.innerHTML = `<img class="inbox-img" src="${escapeHtml(rawUrl)}" alt="${escapeHtml(linkMatch[1])}">`;
+      content.innerHTML = `<img class="inbox-img" src="${escapeHtml(rawUrl)}" alt="${escapeHtml(linkMatch[1])}">`;
       if (tsMatch) {
-        div.innerHTML += `<span class="timestamp">${escapeHtml(tsMatch[1])}</span>`;
+        content.innerHTML += `<span class="timestamp">${escapeHtml(tsMatch[1])}</span>`;
       }
     } else if (tsMatch) {
-      div.innerHTML = `${escapeHtml(mainText)} <span class="timestamp">${escapeHtml(tsMatch[1])}</span>`;
+      content.innerHTML = `${escapeHtml(mainText)} <span class="timestamp">${escapeHtml(tsMatch[1])}</span>`;
     } else {
-      div.textContent = text;
+      content.textContent = text;
     }
+
+    div.appendChild(content);
+    div.appendChild(makeCopyBtn(mainText));
 
     inboxFeed.appendChild(div);
     inboxFeed.scrollTop = inboxFeed.scrollHeight;
@@ -257,7 +283,6 @@
   }
 
   function renderItemsIntoCard(card, items) {
-    const copySvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
     let lastHeaderLevel = 1;
     items.forEach((entry) => {
       if (entry.type === "header") {
@@ -287,26 +312,24 @@
           textWrap.appendChild(dateEl);
         }
 
-        const copyBtn = document.createElement("button");
-        copyBtn.className = "copy-btn";
-        copyBtn.innerHTML = copySvg;
-        copyBtn.title = "Kopiëren";
-        copyBtn.addEventListener("click", () => {
-          navigator.clipboard.writeText(parsed.text);
-          copyBtn.innerHTML = "&#10003;";
-          copyBtn.classList.add("copied");
-          setTimeout(() => {
-            copyBtn.innerHTML = copySvg;
-            copyBtn.classList.remove("copied");
-          }, 1500);
-        });
-
         row.appendChild(circle);
         row.appendChild(textWrap);
-        row.appendChild(copyBtn);
+        row.appendChild(makeCopyBtn(parsed.text));
         card.appendChild(row);
       }
     });
+  }
+
+  function sortItemsByDate(items) {
+    if (!sortNewest) return items;
+    // Separate headers and items, then sort items by date descending
+    const onlyItems = items.filter((e) => e.type !== "header");
+    onlyItems.sort((a, b) => {
+      const dateA = (a.text.match(/^\[(\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?)\]/) || [])[1] || "";
+      const dateB = (b.text.match(/^\[(\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?)\]/) || [])[1] || "";
+      return dateB.localeCompare(dateA);
+    });
+    return onlyItems;
   }
 
   function renderCategory(cat) {
@@ -335,7 +358,7 @@
 
     const card = document.createElement("div");
     card.className = "overview-card";
-    renderItemsIntoCard(card, items);
+    renderItemsIntoCard(card, sortItemsByDate(items));
     overviewContent.appendChild(card);
   }
 
@@ -357,7 +380,7 @@
       title.textContent = categoryLabels[cat] || cat;
       card.appendChild(title);
 
-      renderItemsIntoCard(card, items);
+      renderItemsIntoCard(card, sortItemsByDate(items));
       overviewContent.appendChild(card);
     });
 
@@ -517,6 +540,14 @@
 
   categoryTabs.forEach((tab) => {
     tab.addEventListener("click", () => renderCategory(tab.dataset.cat));
+  });
+
+  const sortBtn = document.getElementById("sort-btn");
+  sortBtn.addEventListener("click", () => {
+    sortNewest = !sortNewest;
+    sortBtn.classList.toggle("active", sortNewest);
+    sortBtn.title = sortNewest ? "Standaard volgorde" : "Sorteer op nieuwste";
+    renderCategory(activeCategory);
   });
 
   refreshBtn.addEventListener("click", loadOverview);
