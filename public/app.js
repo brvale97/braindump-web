@@ -146,6 +146,46 @@
 
   const copySvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
 
+  const deleteSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
+  function makeDeleteBtn(fullText, itemEl) {
+    const btn = document.createElement("button");
+    btn.className = "delete-btn";
+    btn.innerHTML = deleteSvg;
+    btn.title = "Verwijderen";
+    btn.addEventListener("click", async () => {
+      if (!confirm("Dit item verwijderen?")) return;
+      btn.disabled = true;
+      try {
+        const data = await api("/api/inbox", {
+          method: "DELETE",
+          body: JSON.stringify({ item: fullText }),
+        });
+        if (data.error) {
+          alert("Fout: " + data.error);
+          return;
+        }
+        itemEl.style.animation = "none";
+        itemEl.style.transition = "opacity 0.2s, transform 0.2s";
+        itemEl.style.opacity = "0";
+        itemEl.style.transform = "translateX(20px)";
+        setTimeout(() => {
+          itemEl.remove();
+          if (!inboxFeed.querySelector(".inbox-item")) {
+            const empty = document.createElement("div");
+            empty.className = "empty";
+            empty.textContent = "Inbox is leeg";
+            inboxFeed.appendChild(empty);
+          }
+        }, 200);
+      } catch (e) {
+        alert("Kon item niet verwijderen");
+        btn.disabled = false;
+      }
+    });
+    return btn;
+  }
+
   function makeCopyBtn(textToCopy) {
     const btn = document.createElement("button");
     btn.className = "copy-btn";
@@ -193,8 +233,13 @@
       content.textContent = text;
     }
 
+    const actions = document.createElement("div");
+    actions.className = "inbox-item-actions";
+    actions.appendChild(makeCopyBtn(mainText));
+    actions.appendChild(makeDeleteBtn(text, div));
+
     div.appendChild(content);
-    div.appendChild(makeCopyBtn(mainText));
+    div.appendChild(actions);
 
     inboxFeed.appendChild(div);
     inboxFeed.scrollTop = inboxFeed.scrollHeight;

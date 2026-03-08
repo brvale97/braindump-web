@@ -102,6 +102,33 @@ export async function onRequestPost(context) {
   }
 }
 
+// DELETE: remove item from inbox
+export async function onRequestDelete(context) {
+  try {
+    const { item } = await context.request.json();
+    if (!item || !item.trim()) {
+      return Response.json({ error: "Item is vereist" }, { status: 400 });
+    }
+
+    const { content, sha } = await getFile(context.env);
+    const lines = content.split("\n");
+    const target = `- ${item.trim()}`;
+
+    const idx = lines.findIndex((line) => line.trim() === target);
+    if (idx === -1) {
+      return Response.json({ error: "Item niet gevonden" }, { status: 404 });
+    }
+
+    lines.splice(idx, 1);
+    const newContent = lines.join("\n");
+    await updateFile(context.env, newContent, sha, `web: delete "${item.trim().slice(0, 50)}"`);
+
+    return Response.json({ success: true });
+  } catch (e) {
+    return Response.json({ error: e.message }, { status: 500 });
+  }
+}
+
 function parseInbox(content) {
   return content
     .split("\n")

@@ -206,9 +206,46 @@ body {
   min-width: 0;
 }
 
-.inbox-item .copy-btn {
+.inbox-item-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
   flex-shrink: 0;
   margin-top: 2px;
+}
+
+.inbox-item .copy-btn,
+.inbox-item .delete-btn {
+  opacity: 0;
+  transition: opacity 0.2s, color 0.2s;
+}
+
+.inbox-item:hover .copy-btn,
+.inbox-item:hover .delete-btn {
+  opacity: 1;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.delete-btn:hover {
+  color: var(--danger);
+}
+
+@media (hover: none) {
+  .inbox-item .copy-btn,
+  .inbox-item .delete-btn {
+    opacity: 0.4;
+  }
 }
 
 .chat-input {
