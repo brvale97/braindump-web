@@ -19,7 +19,15 @@
   const refreshBtn = document.getElementById("refresh-btn");
 
   let overviewData = {};
-  let activeCategory = "werk";
+  let activeCategory = "alles";
+
+  const categoryLabels = {
+    werk: "GEP",
+    fysiek: "Fysiek",
+    code: "Code",
+    persoonlijk: "Persoonlijk",
+    someday: "Someday",
+  };
 
   // --- Auth ---
 
@@ -198,6 +206,12 @@
 
     // Clear and render
     overviewContent.querySelectorAll(".overview-list, .empty").forEach((el) => el.remove());
+
+    if (cat === "alles") {
+      renderAllCategories();
+      return;
+    }
+
     const items = overviewData[cat] || [];
 
     if (items.length === 0) {
@@ -224,6 +238,50 @@
     });
 
     overviewContent.appendChild(ul);
+  }
+
+  function renderAllCategories() {
+    const order = ["werk", "fysiek", "code", "persoonlijk", "someday"];
+    let hasItems = false;
+
+    order.forEach((cat) => {
+      const items = overviewData[cat] || [];
+      if (items.length === 0) return;
+      hasItems = true;
+
+      const section = document.createElement("div");
+      section.className = "all-section";
+
+      const title = document.createElement("h2");
+      title.className = "section-title";
+      title.textContent = categoryLabels[cat] || cat;
+      section.appendChild(title);
+
+      const ul = document.createElement("ul");
+      ul.className = "overview-list";
+
+      items.forEach((entry) => {
+        const li = document.createElement("li");
+        if (entry.type === "header") {
+          li.className = "header";
+          li.textContent = entry.text;
+        } else {
+          li.className = "item";
+          li.textContent = entry.text;
+        }
+        ul.appendChild(li);
+      });
+
+      section.appendChild(ul);
+      overviewContent.appendChild(section);
+    });
+
+    if (!hasItems) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "Geen items";
+      overviewContent.appendChild(empty);
+    }
   }
 
   // --- Event Listeners ---
