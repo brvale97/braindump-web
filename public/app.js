@@ -251,19 +251,31 @@
 
     const div = document.createElement("div");
     div.className = "inbox-item";
+
+    const content = document.createElement("div");
+    content.className = "inbox-item-content";
     const img = document.createElement("img");
     img.className = "inbox-img";
     img.src = imgSrc;
     img.alt = altText;
-    div.appendChild(img);
+    content.appendChild(img);
 
     const tsMatch = entryText && entryText.match(/\*\((.+?)\)\*$/);
     if (tsMatch) {
       const ts = document.createElement("span");
       ts.className = "timestamp";
       ts.textContent = tsMatch[1];
-      div.appendChild(ts);
+      content.appendChild(ts);
     }
+
+    const itemText = entryText ? entryText.replace(/^- /, "") : altText;
+    const actions = document.createElement("div");
+    actions.className = "inbox-item-actions";
+    actions.appendChild(makeCopyBtn(altText));
+    actions.appendChild(makeDeleteBtn(itemText, div));
+
+    div.appendChild(content);
+    div.appendChild(actions);
 
     inboxFeed.appendChild(div);
     inboxFeed.scrollTop = inboxFeed.scrollHeight;
@@ -562,6 +574,33 @@
         loadOverview();
       }
     });
+  });
+
+  // --- Drag & Drop ---
+
+  const dropZone = document.getElementById("tab-inbox");
+
+  dropZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropZone.classList.add("drag-over");
+  });
+
+  dropZone.addEventListener("dragleave", (e) => {
+    if (!dropZone.contains(e.relatedTarget)) {
+      dropZone.classList.remove("drag-over");
+    }
+  });
+
+  dropZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("drag-over");
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (file.size > MAX_FILE_SIZE) {
+      alert("Bestand is te groot (max 10MB)");
+      return;
+    }
+    showUploadPreview(file);
   });
 
   attachBtn.addEventListener("click", () => fileInput.click());

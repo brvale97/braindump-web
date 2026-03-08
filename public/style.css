@@ -658,6 +658,13 @@ body {
   line-height: 1;
 }
 
+/* Drag & drop */
+.tab-content.drag-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+  background: rgba(218, 123, 59, 0.04);
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
