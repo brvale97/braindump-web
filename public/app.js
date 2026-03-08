@@ -339,7 +339,36 @@
     }
   }
 
-  function renderItemsIntoCard(card, items) {
+  async function markItemDone(category, itemText, row) {
+    const circle = row.querySelector(".circle");
+    circle.classList.add("checking");
+    try {
+      const data = await api("/api/overview", {
+        method: "POST",
+        body: JSON.stringify({ category, itemText }),
+      });
+      if (data.error) {
+        alert("Fout: " + data.error);
+        circle.classList.remove("checking");
+        return;
+      }
+      circle.classList.remove("checking");
+      circle.classList.add("done");
+      circle.innerHTML = "&#10003;";
+      row.classList.add("completed");
+      setTimeout(() => {
+        row.style.transition = "opacity 0.3s, transform 0.3s";
+        row.style.opacity = "0";
+        row.style.transform = "translateX(20px)";
+        setTimeout(() => row.remove(), 300);
+      }, 600);
+    } catch (e) {
+      alert("Kon item niet afvinken");
+      circle.classList.remove("checking");
+    }
+  }
+
+  function renderItemsIntoCard(card, items, category) {
     let lastHeaderLevel = 1;
     items.forEach((entry) => {
       if (entry.type === "header") {
@@ -355,6 +384,8 @@
 
         const circle = document.createElement("div");
         circle.className = "circle";
+        circle.title = "Markeer als klaar";
+        circle.addEventListener("click", () => markItemDone(category, parsed.text, row));
 
         const textWrap = document.createElement("div");
         textWrap.className = "item-text";
@@ -415,7 +446,7 @@
 
     const card = document.createElement("div");
     card.className = "overview-card";
-    renderItemsIntoCard(card, sortItemsByDate(items));
+    renderItemsIntoCard(card, sortItemsByDate(items), cat);
     overviewContent.appendChild(card);
   }
 
@@ -437,7 +468,7 @@
       title.textContent = categoryLabels[cat] || cat;
       card.appendChild(title);
 
-      renderItemsIntoCard(card, sortItemsByDate(items));
+      renderItemsIntoCard(card, sortItemsByDate(items), cat);
       overviewContent.appendChild(card);
     });
 
