@@ -207,6 +207,113 @@ export async function onRequestPost(context) {
   }
 }
 
+// Helper: find item line in files for a category
+async function findItemInCategory(env, category, itemText) {
+  const sortedPath = SORTED_FILES[category];
+  if (!sortedPath) return null;
+
+  const isDir = sortedPath.endsWith("/");
+  let files = [];
+
+  if (isDir) {
+    const res = await githubRequest(env, `contents/${sortedPath}?ref=${BRANCH}`);
+    if (!res.ok) return null;
+    const listing = await res.json();
+    for (const f of listing) {
+      if (f.name.endsWith(".md")) files.push(f.path);
+    }
+  } else {
+    files.push(sortedPath);
+  }
+
+  for (const filePath of files) {
+    const file = await getFileWithSha(env, filePath);
+    if (!file) continue;
+
+    const lines = file.content.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+      if (!trimmed.startsWith("- ") && !trimmed.startsWith("* ")) continue;
+      if (trimmed.includes("~~")) continue;
+
+      const lineText = trimmed.slice(2);
+      const stripped = lineText.replace(/^\[\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?\]\s*/, "");
+
+      if (stripped === itemText || lineText === itemText) {
+        return { file, lineIndex: i, fullLine: lines[i] };
+      }
+    }
+  }
+  return null;
+}
+
+// PUT: move item to different category
+export async function onRequestPut(context) {
+  try {
+    const { fromCategory, toCategory, itemText } = await context.request.json();
+    if (!fromCategory || !toCategory || !itemText) {
+      return Response.json({ error: "fromCategory, toCategory en itemText zijn vereist" }, { status: 400 });
+    }
+    if (fromCategory === toCategory) {
+      return Response.json({ error: "Bron en doel zijn hetzelfde" }, { status: 400 });
+    }
+    if (!SORTED_FILES[toCategory]) {
+      return Response.json({ error: "Onbekende doelcategorie" }, { status: 400 });
+    }
+
+    // 1. Find and remove from source
+    const found = await findItemInCategory(context.env, fromCategory, itemText);
+    if (!found) {
+      return Response.json({ error: "Item niet gevonden in broncategorie" }, { status: 404 });
+    }
+
+    const srcLines = found.file.content.split("\n");
+    const removedLine = srcLines[found.lineIndex];
+    srcLines.splice(found.lineIndex, 1);
+    const newSrcContent = srcLines.join("\n");
+    await updateFile(context.env, found.file.path, newSrcContent, found.file.sha,
+      `web: move "${itemText.slice(0, 40)}" → ${toCategory}`);
+
+    // 2. Add to destination
+    const destPath = SORTED_FILES[toCategory];
+    // For directories, we can't easily pick a file — use the first .md file
+    let destFilePath = destPath;
+    if (destPath.endsWith("/")) {
+      const res = await githubRequest(context.env, `contents/${destPath}?ref=${BRANCH}`);
+      if (!res.ok) return Response.json({ error: "Doelmap niet gevonden" }, { status: 404 });
+      const listing = await res.json();
+      const mdFiles = listing.filter(f => f.name.endsWith(".md") && f.name !== ".gitkeep");
+      if (mdFiles.length === 0) return Response.json({ error: "Geen bestanden in doelmap" }, { status: 404 });
+      destFilePath = mdFiles[0].path;
+    }
+
+    const destFile = await getFileWithSha(context.env, destFilePath);
+    if (!destFile) {
+      return Response.json({ error: "Doelbestand niet gevonden" }, { status: 404 });
+    }
+
+    const destLines = destFile.content.split("\n");
+    // Find the --- separator or end of file, insert after last item
+    let insertIdx = destLines.length;
+    for (let i = destLines.length - 1; i >= 0; i--) {
+      if (destLines[i].trim().startsWith("- ") || destLines[i].trim().startsWith("* ")) {
+        insertIdx = i + 1;
+        break;
+      }
+    }
+    // Extract just the item text (without prefix whitespace changes)
+    const itemLine = removedLine.trim();
+    destLines.splice(insertIdx, 0, itemLine);
+    const newDestContent = destLines.join("\n");
+    await updateFile(context.env, destFilePath, newDestContent, destFile.sha,
+      `web: move "${itemText.slice(0, 40)}" → ${toCategory}`);
+
+    return Response.json({ success: true });
+  } catch (e) {
+    return Response.json({ error: e.message }, { status: 500 });
+  }
+}
+
 export async function onRequestGet(context) {
   try {
     const categories = {};

@@ -586,8 +586,71 @@ body {
   color: var(--accent);
 }
 
+.move-wrap {
+  position: relative;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.move-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.2s, color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.overview-item:hover .move-btn {
+  opacity: 1;
+}
+
+.move-btn:hover {
+  color: var(--accent);
+}
+
+.move-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  z-index: 50;
+  min-width: 120px;
+  overflow: hidden;
+}
+
+.move-option {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.85rem;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+  transition: background 0.15s;
+}
+
+.move-option:hover {
+  background: var(--surface2);
+}
+
+.move-option + .move-option {
+  border-top: 1px solid var(--border);
+}
+
 @media (hover: none) {
-  .copy-btn {
+  .copy-btn,
+  .move-btn {
     opacity: 0.4;
   }
 }

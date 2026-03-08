@@ -368,6 +368,68 @@
     }
   }
 
+  const moveSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>';
+
+  function makeMoveBtn(category, itemText, row) {
+    const wrap = document.createElement("div");
+    wrap.className = "move-wrap";
+
+    const btn = document.createElement("button");
+    btn.className = "move-btn";
+    btn.innerHTML = moveSvg;
+    btn.title = "Verplaatsen";
+
+    const menu = document.createElement("div");
+    menu.className = "move-menu hidden";
+
+    const allCats = { werk: "GEP", fysiek: "Fysiek", code: "Code", persoonlijk: "Persoonlijk", someday: "Someday" };
+    for (const [key, label] of Object.entries(allCats)) {
+      if (key === category) continue;
+      const opt = document.createElement("button");
+      opt.className = "move-option";
+      opt.textContent = label;
+      opt.addEventListener("click", async () => {
+        menu.classList.add("hidden");
+        row.style.opacity = "0.5";
+        try {
+          const data = await api("/api/overview", {
+            method: "PUT",
+            body: JSON.stringify({ fromCategory: category, toCategory: key, itemText }),
+          });
+          if (data.error) {
+            alert("Fout: " + data.error);
+            row.style.opacity = "1";
+            return;
+          }
+          row.style.transition = "opacity 0.3s, transform 0.3s";
+          row.style.opacity = "0";
+          row.style.transform = "translateX(20px)";
+          setTimeout(() => row.remove(), 300);
+        } catch (e) {
+          alert("Kon item niet verplaatsen");
+          row.style.opacity = "1";
+        }
+      });
+      menu.appendChild(opt);
+    }
+
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      // Close any other open menus
+      document.querySelectorAll(".move-menu").forEach(m => m.classList.add("hidden"));
+      menu.classList.toggle("hidden");
+    });
+
+    wrap.appendChild(btn);
+    wrap.appendChild(menu);
+    return wrap;
+  }
+
+  // Close move menus on outside click
+  document.addEventListener("click", () => {
+    document.querySelectorAll(".move-menu").forEach(m => m.classList.add("hidden"));
+  });
+
   function renderItemsIntoCard(card, items, category) {
     let lastHeaderLevel = 1;
     items.forEach((entry) => {
@@ -402,6 +464,7 @@
 
         row.appendChild(circle);
         row.appendChild(textWrap);
+        row.appendChild(makeMoveBtn(category, parsed.text, row));
         row.appendChild(makeCopyBtn(parsed.text));
         card.appendChild(row);
       }
