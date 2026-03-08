@@ -199,61 +199,48 @@ body {
 }
 
 .chat-input {
-  display: flex;
-  gap: 0.5rem;
   padding: 0.75rem 1rem;
   background: var(--bg);
   border-top: 1px solid var(--border);
 }
 
-.chat-input input {
-  flex: 1;
-  padding: 0.75rem 1rem;
-  font-size: 0.95rem;
-  border: 1px solid var(--border);
-  border-radius: 24px;
+.composer {
   background: var(--surface);
-  color: var(--text);
-  outline: none;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
   transition: border-color 0.2s;
 }
 
-.chat-input input:focus {
+.composer:focus-within {
   border-color: var(--accent);
 }
 
-.chat-input input::placeholder {
+.composer input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  outline: none;
+}
+
+.composer input::placeholder {
   color: var(--text-muted);
 }
 
-.chat-input button {
-  width: 42px;
-  height: 42px;
-  background: var(--accent);
-  color: white;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
+.composer-actions {
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: background 0.2s;
+  justify-content: space-between;
+  padding: 0.25rem 0.5rem 0.5rem;
 }
 
-.chat-input button:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
-.chat-input button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-/* Attach button */
+/* Attach button (+ icon, left side) */
 .attach-btn {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   background: none;
   color: var(--text-muted);
   border: none;
@@ -276,45 +263,77 @@ body {
   cursor: not-allowed;
 }
 
-/* Upload preview */
-.upload-preview {
+/* Send button (right side) */
+#inbox-send {
+  width: 36px;
+  height: 36px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 1rem;
-  background: var(--surface2);
-  border-top: 1px solid var(--border);
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+#inbox-send:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+#inbox-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Upload preview inside composer */
+.upload-preview {
+  position: relative;
+  display: inline-block;
+  padding: 0.75rem 0.75rem 0;
 }
 
 .upload-preview img {
-  max-height: 80px;
-  max-width: 120px;
+  max-height: 100px;
+  max-width: 160px;
   border-radius: 8px;
   object-fit: cover;
+  display: block;
 }
 
 .upload-preview .file-name {
+  display: inline-block;
   font-size: 0.85rem;
   color: var(--text);
+  background: var(--surface2);
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
   word-break: break-all;
 }
 
 .upload-preview .remove {
-  margin-left: auto;
-  background: none;
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  width: 22px;
+  height: 22px;
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
   border: none;
-  color: var(--text-muted);
-  font-size: 1.25rem;
+  border-radius: 50%;
   cursor: pointer;
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
+  font-size: 0.85rem;
   line-height: 1;
-  transition: color 0.2s, background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
 }
 
 .upload-preview .remove:hover {
-  color: var(--danger);
-  background: var(--surface);
+  background: rgba(0, 0, 0, 0.8);
 }
 
 /* Overview */
