@@ -152,8 +152,19 @@
 
     // Extract timestamp if present
     const tsMatch = text.match(/\*\((.+?)\)\*$/);
-    if (tsMatch) {
-      const mainText = text.replace(/\s*\*\(.+?\)\*$/, "");
+    const mainText = tsMatch ? text.replace(/\s*\*\(.+?\)\*$/, "") : text;
+
+    // Check for markdown image link: [filename.ext](url)
+    const imgExts = /\.(jpe?g|png|gif|webp|svg)$/i;
+    const linkMatch = mainText.match(/^\[(.+?)\]\((.+?)\)$/);
+
+    if (linkMatch && imgExts.test(linkMatch[1])) {
+      const rawUrl = linkMatch[2].replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/");
+      div.innerHTML = `<img class="inbox-img" src="${escapeHtml(rawUrl)}" alt="${escapeHtml(linkMatch[1])}">`;
+      if (tsMatch) {
+        div.innerHTML += `<span class="timestamp">${escapeHtml(tsMatch[1])}</span>`;
+      }
+    } else if (tsMatch) {
       div.innerHTML = `${escapeHtml(mainText)} <span class="timestamp">${escapeHtml(tsMatch[1])}</span>`;
     } else {
       div.textContent = text;
