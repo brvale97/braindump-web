@@ -242,6 +242,73 @@ body {
   cursor: not-allowed;
 }
 
+/* Attach button */
+.attach-btn {
+  width: 42px;
+  height: 42px;
+  background: none;
+  color: var(--text-muted);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.2s, background 0.2s;
+}
+
+.attach-btn:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+.attach-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Upload preview */
+.upload-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--surface2);
+  border-top: 1px solid var(--border);
+}
+
+.upload-preview img {
+  max-height: 80px;
+  max-width: 120px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.upload-preview .file-name {
+  font-size: 0.85rem;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.upload-preview .remove {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  line-height: 1;
+  transition: color 0.2s, background 0.2s;
+}
+
+.upload-preview .remove:hover {
+  color: var(--danger);
+  background: var(--surface);
+}
+
 /* Overview */
 .overview-header {
   display: flex;

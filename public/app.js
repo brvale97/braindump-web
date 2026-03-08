@@ -17,9 +17,11 @@
   const overviewContent = document.getElementById("overview-content");
   const overviewLoading = document.getElementById("overview-loading");
   const refreshBtn = document.getElementById("refresh-btn");
+  const fileInput = document.getElementById("file-input");
 
   let overviewData = {};
   let activeCategory = "alles";
+  let pendingFile = null;
 
   const categoryLabels = {
     werk: "GEP",
@@ -332,6 +334,107 @@
     }
   }
 
+  // --- Upload ---
+
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  const attachBtn = document.getElementById("attach-btn");
+  const uploadPreview = document.getElementById("upload-preview");
+
+  function showUploadPreview(file) {
+    pendingFile = file;
+    uploadPreview.innerHTML = "";
+    uploadPreview.classList.remove("hidden");
+
+    if (file.type.startsWith("image/")) {
+      const img = document.createElement("img");
+      img.src = URL.createObjectURL(file);
+      uploadPreview.appendChild(img);
+    } else {
+      const name = document.createElement("span");
+      name.className = "file-name";
+      name.textContent = file.name;
+      uploadPreview.appendChild(name);
+    }
+
+    const remove = document.createElement("button");
+    remove.className = "remove";
+    remove.textContent = "\u00D7";
+    remove.title = "Verwijderen";
+    remove.addEventListener("click", clearUploadPreview);
+    uploadPreview.appendChild(remove);
+  }
+
+  function clearUploadPreview() {
+    pendingFile = null;
+    uploadPreview.classList.add("hidden");
+    uploadPreview.innerHTML = "";
+    fileInput.value = "";
+  }
+
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result.split(",")[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function uploadFile(file) {
+    const base64 = await readFileAsBase64(file);
+    const data = await api("/api/upload", {
+      method: "POST",
+      body: JSON.stringify({
+        filename: file.name,
+        mimeType: file.type,
+        content: base64,
+      }),
+    });
+    if (data.error) throw new Error(data.error);
+    return data;
+  }
+
+  async function handleSend() {
+    const text = inboxInput.value.trim();
+    const file = pendingFile;
+
+    if (!text && !file) return;
+
+    inboxSend.disabled = true;
+    inboxInput.disabled = true;
+    attachBtn.disabled = true;
+
+    try {
+      if (file) {
+        const result = await uploadFile(file);
+        appendInboxItem(result.entry.replace(/^- /, ""));
+        clearUploadPreview();
+      }
+      if (text) {
+        const data = await api("/api/inbox", {
+          method: "POST",
+          body: JSON.stringify({ item: text }),
+        });
+        if (data.error) {
+          alert("Fout: " + data.error);
+          return;
+        }
+        appendInboxItem(data.item.replace(/^- /, ""));
+        inboxInput.value = "";
+      }
+    } catch (e) {
+      alert("Fout: " + e.message);
+    } finally {
+      inboxSend.disabled = false;
+      inboxInput.disabled = false;
+      attachBtn.disabled = false;
+      inboxInput.focus();
+    }
+  }
+
   // --- Event Listeners ---
 
   pinSubmit.addEventListener("click", () => login(pinInput.value));
@@ -353,16 +456,23 @@
     });
   });
 
-  inboxSend.addEventListener("click", () => {
-    const text = inboxInput.value.trim();
-    if (text) addInboxItem(text);
+  attachBtn.addEventListener("click", () => fileInput.click());
+
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    if (file.size > MAX_FILE_SIZE) {
+      alert("Bestand is te groot (max 10MB)");
+      fileInput.value = "";
+      return;
+    }
+    showUploadPreview(file);
   });
 
+  inboxSend.addEventListener("click", handleSend);
+
   inboxInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      const text = inboxInput.value.trim();
-      if (text) addInboxItem(text);
-    }
+    if (e.key === "Enter") handleSend();
   });
 
   categoryTabs.forEach((tab) => {
