@@ -1,0 +1,6 @@
+name = "braindump-web"
+compatibility_date = "2024-09-23"
+
+[vars]
+REPO_OWNER = "brvale97"
+REPO_NAME = "braindump-bram"

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Braindump</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!-- PIN Screen -->
+  <div id="login-screen" class="screen">
+    <div class="login-box">
+      <h1>Braindump</h1>
+      <input type="password" id="pin-input" inputmode="numeric" placeholder="PIN" maxlength="10" autocomplete="off">
+      <button id="pin-submit">Unlock</button>
+      <p id="pin-error" class="error hidden"></p>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app-screen" class="screen hidden">
+    <!-- Tab navigation -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="inbox">Inbox</button>
+      <button class="tab" data-tab="overview">Overzicht</button>
+    </nav>
+
+    <!-- Inbox tab -->
+    <div id="tab-inbox" class="tab-content active">
+      <div class="inbox-feed" id="inbox-feed">
+        <div class="loading" id="inbox-loading">Laden...</div>
+      </div>
+      <div class="chat-input">
+        <input type="text" id="inbox-input" placeholder="Nieuw item..." autocomplete="off">
+        <button id="inbox-send">+</button>
+      </div>
+    </div>
+
+    <!-- Overview tab -->
+    <div id="tab-overview" class="tab-content hidden">
+      <div class="overview-header">
+        <button id="refresh-btn" class="refresh-btn">&#x21bb; Refresh</button>
+      </div>
+      <div class="category-tabs" id="category-tabs">
+        <button class="cat-tab active" data-cat="werk">Werk</button>
+        <button class="cat-tab" data-cat="fysiek">Fysiek</button>
+        <button class="cat-tab" data-cat="code">Code</button>
+        <button class="cat-tab" data-cat="persoonlijk">Persoonlijk</button>
+        <button class="cat-tab" data-cat="someday">Someday</button>
+      </div>
+      <div class="overview-content" id="overview-content">
+        <div class="loading" id="overview-loading">Laden...</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
