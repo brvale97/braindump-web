@@ -1,0 +1,9 @@
+{
+  "name": "Braindump",
+  "short_name": "Braindump",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }],
+  "theme_color": "#DA7B3B",
+  "background_color": "#F5F3EE",
+  "display": "standalone",
+  "start_url": "/"
+}
