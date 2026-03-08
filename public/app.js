@@ -174,6 +174,30 @@
     inboxFeed.scrollTop = inboxFeed.scrollHeight;
   }
 
+  function appendInboxImage(imgSrc, altText, entryText) {
+    const emptyEl = inboxFeed.querySelector(".empty");
+    if (emptyEl) emptyEl.remove();
+
+    const div = document.createElement("div");
+    div.className = "inbox-item";
+    const img = document.createElement("img");
+    img.className = "inbox-img";
+    img.src = imgSrc;
+    img.alt = altText;
+    div.appendChild(img);
+
+    const tsMatch = entryText && entryText.match(/\*\((.+?)\)\*$/);
+    if (tsMatch) {
+      const ts = document.createElement("span");
+      ts.className = "timestamp";
+      ts.textContent = tsMatch[1];
+      div.appendChild(ts);
+    }
+
+    inboxFeed.appendChild(div);
+    inboxFeed.scrollTop = inboxFeed.scrollHeight;
+  }
+
   async function addInboxItem(text) {
     inboxSend.disabled = true;
     inboxInput.disabled = true;
@@ -420,8 +444,13 @@
 
     try {
       if (file) {
+        const localUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
         const result = await uploadFile(file);
-        appendInboxItem(result.entry.replace(/^- /, ""));
+        if (localUrl) {
+          appendInboxImage(localUrl, file.name, result.entry);
+        } else {
+          appendInboxItem(result.entry.replace(/^- /, ""));
+        }
         clearUploadPreview();
       }
       if (text) {
