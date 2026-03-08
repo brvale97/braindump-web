@@ -187,9 +187,28 @@
 
   // --- Overview ---
 
+  function parseItemText(text) {
+    const match = text.match(/^\[(\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?)\]\s*/);
+    if (match) return { text: text.slice(match[0].length), date: match[1] };
+    return { text, date: null };
+  }
+
+  function formatDate(dateStr) {
+    const parts = dateStr.split(/\s+/);
+    const [y, m, d] = parts[0].split("-");
+    const months = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+    let result = `${parseInt(d)} ${months[parseInt(m) - 1]}`;
+    if (parts[1]) result += `, ${parts[1]}`;
+    return result;
+  }
+
+  function renderMarkdown(text) {
+    return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  }
+
   async function loadOverview() {
     overviewLoading.classList.remove("hidden");
-    overviewContent.querySelectorAll(".overview-list").forEach((el) => el.remove());
+    overviewContent.querySelectorAll(".overview-card").forEach((el) => el.remove());
     try {
       const data = await api("/api/overview");
       overviewData = data.categories || {};
@@ -201,6 +220,7 @@
   }
 
   function renderItemsIntoCard(card, items) {
+    const copySvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
     let lastHeaderLevel = 1;
     items.forEach((entry) => {
       if (entry.type === "header") {
@@ -210,15 +230,43 @@
         header.textContent = entry.text;
         card.appendChild(header);
       } else {
+        const parsed = parseItemText(entry.text);
         const row = document.createElement("div");
         row.className = "overview-item" + (lastHeaderLevel >= 3 ? " sub-item" : "");
+
         const circle = document.createElement("div");
         circle.className = "circle";
-        const text = document.createElement("span");
-        text.className = "item-text";
-        text.textContent = entry.text;
+
+        const textWrap = document.createElement("div");
+        textWrap.className = "item-text";
+        const mainEl = document.createElement("span");
+        mainEl.className = "item-main";
+        mainEl.innerHTML = renderMarkdown(parsed.text);
+        textWrap.appendChild(mainEl);
+        if (parsed.date) {
+          const dateEl = document.createElement("span");
+          dateEl.className = "item-date";
+          dateEl.textContent = formatDate(parsed.date);
+          textWrap.appendChild(dateEl);
+        }
+
+        const copyBtn = document.createElement("button");
+        copyBtn.className = "copy-btn";
+        copyBtn.innerHTML = copySvg;
+        copyBtn.title = "Kopiëren";
+        copyBtn.addEventListener("click", () => {
+          navigator.clipboard.writeText(parsed.text);
+          copyBtn.innerHTML = "&#10003;";
+          copyBtn.classList.add("copied");
+          setTimeout(() => {
+            copyBtn.innerHTML = copySvg;
+            copyBtn.classList.remove("copied");
+          }, 1500);
+        });
+
         row.appendChild(circle);
-        row.appendChild(text);
+        row.appendChild(textWrap);
+        row.appendChild(copyBtn);
         card.appendChild(row);
       }
     });

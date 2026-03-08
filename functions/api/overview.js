@@ -36,7 +36,7 @@ async function getFileContent(env, filePath) {
         if (fileRes.ok) {
           const fileData = await fileRes.json();
           const content = decodeBase64(fileData.content);
-          combined += `### ${file.name.replace(".md", "")}\n${content}\n\n`;
+          combined += content + "\n\n";
         }
       }
     }
@@ -72,10 +72,20 @@ function parseStructured(content) {
   const lines = content.split("\n");
   const result = [];
 
+  const skipHeaders = new Set([
+    "werk", "fysieke taken", "persoonlijk",
+    "persoonlijke herinneringen, afspraken en notities.",
+    "someday / misschien later",
+    "ideeën & taken", "notities",
+  ]);
+
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed.startsWith("#")) {
-      result.push({ type: "header", text: trimmed.replace(/^#+\s*/, ""), level: (trimmed.match(/^#+/) || [""])[0].length });
+      const text = trimmed.replace(/^#+\s*/, "");
+      const level = (trimmed.match(/^#+/) || [""])[0].length;
+      if (skipHeaders.has(text.toLowerCase())) continue;
+      result.push({ type: "header", text, level });
     } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
       const text = trimmed.slice(2);
       // Skip done items
@@ -88,6 +98,12 @@ function parseStructured(content) {
       }
     }
   }
+
+  // Remove trailing headers with no items after them
+  while (result.length > 0 && result[result.length - 1].type === "header") {
+    result.pop();
+  }
+
   return result;
 }
 

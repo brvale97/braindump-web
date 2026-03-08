@@ -373,6 +373,49 @@ body {
 .overview-item .item-text {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.overview-item .item-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
+.copy-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.2s, color 0.2s;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+}
+
+.overview-item:hover .copy-btn {
+  opacity: 1;
+}
+
+.copy-btn:hover {
+  color: var(--text);
+}
+
+.copy-btn.copied {
+  opacity: 1;
+  color: var(--accent);
+}
+
+@media (hover: none) {
+  .copy-btn {
+    opacity: 0.4;
+  }
 }
 
 .overview-item.sub-item {
