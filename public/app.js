@@ -17,6 +17,7 @@
   const overviewContent = document.getElementById("overview-content");
   const overviewLoading = document.getElementById("overview-loading");
   const refreshBtn = document.getElementById("refresh-btn");
+  const inboxRefreshBtn = document.getElementById("inbox-refresh-btn");
   const fileInput = document.getElementById("file-input");
 
   let overviewData = {};
@@ -525,6 +526,72 @@
     document.querySelectorAll(".move-menu").forEach(m => m.classList.add("hidden"));
   });
 
+  function makeOverviewContextBtn(category, itemText, row) {
+    const btn = document.createElement("button");
+    btn.className = "context-btn";
+    btn.innerHTML = contextSvg;
+    btn.title = "Context toevoegen";
+    btn.addEventListener("click", () => {
+      let wrap = row.querySelector(".context-input-wrap");
+      if (wrap) {
+        wrap.remove();
+        return;
+      }
+      wrap = document.createElement("div");
+      wrap.className = "context-input-wrap";
+      const input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = "Context toevoegen...";
+      const sendBtn = document.createElement("button");
+      sendBtn.textContent = "Toevoegen";
+      sendBtn.className = "context-send-btn";
+
+      async function submitContext() {
+        const val = input.value.trim();
+        if (!val) return;
+        input.disabled = true;
+        sendBtn.disabled = true;
+        try {
+          const data = await api("/api/overview", {
+            method: "PATCH",
+            body: JSON.stringify({ category, itemText, context: val }),
+          });
+          if (data.error) {
+            alert("Fout: " + data.error);
+            return;
+          }
+          const contextContainer = row.querySelector(".overview-contexts");
+          const ctxDiv = document.createElement("div");
+          ctxDiv.className = "inbox-context";
+          const ctxTsMatch = data.context.match(/\*\((.+?)\)\*$/);
+          const ctxText = ctxTsMatch ? data.context.replace(/\s*\*\(.+?\)\*$/, "") : data.context;
+          ctxDiv.innerHTML = escapeHtml(ctxText);
+          if (ctxTsMatch) {
+            ctxDiv.innerHTML += ` <span class="timestamp">${escapeHtml(ctxTsMatch[1])}</span>`;
+          }
+          contextContainer.appendChild(ctxDiv);
+          wrap.remove();
+        } catch (e) {
+          alert("Kon context niet toevoegen");
+          input.disabled = false;
+          sendBtn.disabled = false;
+        }
+      }
+
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") submitContext();
+        if (e.key === "Escape") wrap.remove();
+      });
+      sendBtn.addEventListener("click", submitContext);
+
+      wrap.appendChild(input);
+      wrap.appendChild(sendBtn);
+      row.querySelector(".item-text").appendChild(wrap);
+      input.focus();
+    });
+    return btn;
+  }
+
   function renderItemsIntoCard(card, items, category) {
     let lastHeaderLevel = 1;
     items.forEach((entry) => {
@@ -536,6 +603,7 @@
         card.appendChild(header);
       } else {
         const parsed = parseItemText(entry.text);
+        const contexts = entry.contexts || [];
         const row = document.createElement("div");
         row.className = "overview-item" + (lastHeaderLevel >= 3 ? " sub-item" : "");
 
@@ -557,8 +625,25 @@
           textWrap.appendChild(dateEl);
         }
 
+        // Context sub-items
+        const contextContainer = document.createElement("div");
+        contextContainer.className = "overview-contexts";
+        contexts.forEach((ctx) => {
+          const ctxDiv = document.createElement("div");
+          ctxDiv.className = "inbox-context";
+          const ctxTsMatch = ctx.match(/\*\((.+?)\)\*$/);
+          const ctxText = ctxTsMatch ? ctx.replace(/\s*\*\(.+?\)\*$/, "") : ctx;
+          ctxDiv.innerHTML = escapeHtml(ctxText);
+          if (ctxTsMatch) {
+            ctxDiv.innerHTML += ` <span class="timestamp">${escapeHtml(ctxTsMatch[1])}</span>`;
+          }
+          contextContainer.appendChild(ctxDiv);
+        });
+        textWrap.appendChild(contextContainer);
+
         row.appendChild(circle);
         row.appendChild(textWrap);
+        row.appendChild(makeOverviewContextBtn(category, parsed.text, row));
         row.appendChild(makeMoveBtn(category, parsed.text, row));
         row.appendChild(makeCopyBtn(parsed.text));
         card.appendChild(row);
@@ -824,6 +909,7 @@
   });
 
   refreshBtn.addEventListener("click", loadOverview);
+  inboxRefreshBtn.addEventListener("click", loadInbox);
 
   // --- Helpers ---
 

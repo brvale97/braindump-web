@@ -81,6 +81,8 @@ function parseStructured(content) {
 
   for (const line of lines) {
     const trimmed = line.trim();
+    const indent = line.length - line.trimStart().length;
+
     if (trimmed.startsWith("#")) {
       const text = trimmed.replace(/^#+\s*/, "");
       const level = (trimmed.match(/^#+/) || [""])[0].length;
@@ -90,11 +92,18 @@ function parseStructured(content) {
       const text = trimmed.slice(2);
       // Skip done items
       if (text.includes("~~") || text.startsWith("[x]") || text.startsWith("[X]")) continue;
-      // Skip empty checkbox items
-      if (text.startsWith("[ ]")) {
-        result.push({ type: "item", text: text.slice(4).trim() });
+
+      // Indented = sub-item / context of the last item
+      if (indent >= 2) {
+        const lastItem = [...result].reverse().find((r) => r.type === "item");
+        if (lastItem) {
+          const ctxText = text.startsWith("[ ]") ? text.slice(4).trim() : text;
+          lastItem.contexts.push(ctxText);
+        }
+      } else if (text.startsWith("[ ]")) {
+        result.push({ type: "item", text: text.slice(4).trim(), contexts: [] });
       } else {
-        result.push({ type: "item", text });
+        result.push({ type: "item", text, contexts: [] });
       }
     }
   }
@@ -309,6 +318,56 @@ export async function onRequestPut(context) {
       `web: move "${itemText.slice(0, 40)}" → ${toCategory}`);
 
     return Response.json({ success: true });
+  } catch (e) {
+    return Response.json({ error: e.message }, { status: 500 });
+  }
+}
+
+// PATCH: add context to an overview item
+export async function onRequestPatch(context) {
+  try {
+    const { category, itemText, context: ctxText } = await context.request.json();
+    if (!category || !itemText || !ctxText || !ctxText.trim()) {
+      return Response.json({ error: "category, itemText en context zijn vereist" }, { status: 400 });
+    }
+
+    const found = await findItemInCategory(context.env, category, itemText);
+    if (!found) {
+      return Response.json({ error: "Item niet gevonden" }, { status: 404 });
+    }
+
+    const lines = found.file.content.split("\n");
+
+    // Find end of existing sub-items after the parent line
+    let insertAt = found.lineIndex + 1;
+    while (insertAt < lines.length) {
+      const nextLine = lines[insertAt];
+      const nextIndent = nextLine.length - nextLine.trimStart().length;
+      const nextTrimmed = nextLine.trim();
+      if (nextIndent >= 2 && (nextTrimmed.startsWith("- ") || nextTrimmed.startsWith("* "))) {
+        insertAt++;
+      } else {
+        break;
+      }
+    }
+
+    const now = new Date();
+    const timestamp = now.toLocaleString("nl-NL", {
+      timeZone: "Europe/Amsterdam",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const contextLine = `  - ${ctxText.trim()} *(${timestamp})*`;
+    lines.splice(insertAt, 0, contextLine);
+
+    const newContent = lines.join("\n");
+    await updateFile(context.env, found.file.path, newContent, found.file.sha,
+      `web: context on "${itemText.slice(0, 40)}"`);
+
+    return Response.json({ success: true, context: contextLine.slice(4) });
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });
   }
