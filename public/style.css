@@ -241,9 +241,103 @@ body {
   color: var(--danger);
 }
 
+.inbox-item .context-btn {
+  opacity: 0;
+  transition: opacity 0.2s, color 0.2s;
+}
+
+.inbox-item:hover .context-btn {
+  opacity: 1;
+}
+
+.context-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.context-btn:hover {
+  color: var(--accent);
+}
+
+/* Context sub-items */
+.inbox-contexts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.inbox-context {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--border);
+  margin-top: 0.35rem;
+  line-height: 1.5;
+}
+
+.inbox-context .timestamp {
+  display: inline;
+  margin-top: 0;
+  margin-left: 0.3rem;
+}
+
+/* Context inline input */
+.context-input-wrap {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  align-items: center;
+}
+
+.context-input-wrap input {
+  flex: 1;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.82rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface2);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.context-input-wrap input:focus {
+  border-color: var(--accent);
+}
+
+.context-send-btn {
+  padding: 0.4rem 0.65rem;
+  font-size: 0.78rem;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+
+.context-send-btn:hover {
+  background: var(--accent-hover);
+}
+
+.context-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 @media (hover: none) {
   .inbox-item .copy-btn,
-  .inbox-item .delete-btn {
+  .inbox-item .delete-btn,
+  .inbox-item .context-btn {
     opacity: 0.4;
   }
 }

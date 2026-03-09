@@ -119,7 +119,12 @@ export async function onRequestDelete(context) {
       return Response.json({ error: "Item niet gevonden" }, { status: 404 });
     }
 
-    lines.splice(idx, 1);
+    // Count sub-items (lines starting with "  - " after the parent)
+    let removeCount = 1;
+    while (idx + removeCount < lines.length && lines[idx + removeCount].startsWith("  - ")) {
+      removeCount++;
+    }
+    lines.splice(idx, removeCount);
     const newContent = lines.join("\n");
     await updateFile(context.env, newContent, sha, `web: delete "${item.trim().slice(0, 50)}"`);
 
@@ -129,9 +134,59 @@ export async function onRequestDelete(context) {
   }
 }
 
+// PATCH: add context to an existing inbox item
+export async function onRequestPatch(context) {
+  try {
+    const { parentItem, context: ctxText } = await context.request.json();
+    if (!parentItem || !ctxText || !ctxText.trim()) {
+      return Response.json({ error: "parentItem en context zijn vereist" }, { status: 400 });
+    }
+
+    const { content, sha } = await getFile(context.env);
+    const lines = content.split("\n");
+    const target = `- ${parentItem.trim()}`;
+
+    const idx = lines.findIndex((line) => line.trim() === target);
+    if (idx === -1) {
+      return Response.json({ error: "Parent item niet gevonden" }, { status: 404 });
+    }
+
+    // Find end of existing sub-items
+    let insertAt = idx + 1;
+    while (insertAt < lines.length && lines[insertAt].startsWith("  - ")) {
+      insertAt++;
+    }
+
+    const now = new Date();
+    const timestamp = now.toLocaleString("nl-NL", {
+      timeZone: "Europe/Amsterdam",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const contextLine = `  - ${ctxText.trim()} *(${timestamp})*`;
+    lines.splice(insertAt, 0, contextLine);
+
+    const newContent = lines.join("\n");
+    await updateFile(context.env, newContent, sha, `web: context on "${parentItem.trim().slice(0, 40)}"`);
+
+    return Response.json({ success: true, context: contextLine.slice(4) });
+  } catch (e) {
+    return Response.json({ error: e.message }, { status: 500 });
+  }
+}
+
 function parseInbox(content) {
-  return content
-    .split("\n")
-    .filter((line) => line.startsWith("- "))
-    .map((line) => line.slice(2));
+  const lines = content.split("\n");
+  const items = [];
+  for (const line of lines) {
+    if (line.startsWith("- ")) {
+      items.push({ text: line.slice(2), contexts: [] });
+    } else if (line.startsWith("  - ") && items.length > 0) {
+      items[items.length - 1].contexts.push(line.slice(4));
+    }
+  }
+  return items;
 }

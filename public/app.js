@@ -136,8 +136,13 @@
       return;
     }
 
-    items.forEach((text) => {
-      appendInboxItem(text);
+    items.forEach((item) => {
+      // Support both old string format and new {text, contexts} format
+      if (typeof item === "string") {
+        appendInboxItem({ text: item, contexts: [] });
+      } else {
+        appendInboxItem(item);
+      }
     });
 
     // Scroll to bottom
@@ -147,6 +152,8 @@
   const copySvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
 
   const deleteSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
+  const contextSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
 
   function makeDeleteBtn(fullText, itemEl) {
     const btn = document.createElement("button");
@@ -203,9 +210,80 @@
     return btn;
   }
 
-  function appendInboxItem(text) {
+  function makeContextBtn(fullText, itemEl) {
+    const btn = document.createElement("button");
+    btn.className = "context-btn";
+    btn.innerHTML = contextSvg;
+    btn.title = "Context toevoegen";
+    btn.addEventListener("click", () => {
+      // Toggle inline input
+      let wrap = itemEl.querySelector(".context-input-wrap");
+      if (wrap) {
+        wrap.remove();
+        return;
+      }
+      wrap = document.createElement("div");
+      wrap.className = "context-input-wrap";
+      const input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = "Context toevoegen...";
+      const sendBtn = document.createElement("button");
+      sendBtn.textContent = "Toevoegen";
+      sendBtn.className = "context-send-btn";
+
+      async function submitContext() {
+        const val = input.value.trim();
+        if (!val) return;
+        input.disabled = true;
+        sendBtn.disabled = true;
+        try {
+          const data = await api("/api/inbox", {
+            method: "PATCH",
+            body: JSON.stringify({ parentItem: fullText, context: val }),
+          });
+          if (data.error) {
+            alert("Fout: " + data.error);
+            return;
+          }
+          // Add context to DOM
+          const contextContainer = itemEl.querySelector(".inbox-contexts");
+          const ctxDiv = document.createElement("div");
+          ctxDiv.className = "inbox-context";
+          const ctxTsMatch = data.context.match(/\*\((.+?)\)\*$/);
+          const ctxText = ctxTsMatch ? data.context.replace(/\s*\*\(.+?\)\*$/, "") : data.context;
+          ctxDiv.innerHTML = escapeHtml(ctxText);
+          if (ctxTsMatch) {
+            ctxDiv.innerHTML += ` <span class="timestamp">${escapeHtml(ctxTsMatch[1])}</span>`;
+          }
+          contextContainer.appendChild(ctxDiv);
+          wrap.remove();
+        } catch (e) {
+          alert("Kon context niet toevoegen");
+          input.disabled = false;
+          sendBtn.disabled = false;
+        }
+      }
+
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") submitContext();
+        if (e.key === "Escape") wrap.remove();
+      });
+      sendBtn.addEventListener("click", submitContext);
+
+      wrap.appendChild(input);
+      wrap.appendChild(sendBtn);
+      itemEl.querySelector(".inbox-item-content").appendChild(wrap);
+      input.focus();
+    });
+    return btn;
+  }
+
+  function appendInboxItem(itemObj) {
     const emptyEl = inboxFeed.querySelector(".empty");
     if (emptyEl) emptyEl.remove();
+
+    const text = typeof itemObj === "string" ? itemObj : itemObj.text;
+    const contexts = (typeof itemObj === "object" && itemObj.contexts) || [];
 
     const div = document.createElement("div");
     div.className = "inbox-item";
@@ -233,8 +311,25 @@
       content.textContent = text;
     }
 
+    // Context sub-items container
+    const contextContainer = document.createElement("div");
+    contextContainer.className = "inbox-contexts";
+    contexts.forEach((ctx) => {
+      const ctxDiv = document.createElement("div");
+      ctxDiv.className = "inbox-context";
+      const ctxTsMatch = ctx.match(/\*\((.+?)\)\*$/);
+      const ctxText = ctxTsMatch ? ctx.replace(/\s*\*\(.+?\)\*$/, "") : ctx;
+      ctxDiv.innerHTML = escapeHtml(ctxText);
+      if (ctxTsMatch) {
+        ctxDiv.innerHTML += ` <span class="timestamp">${escapeHtml(ctxTsMatch[1])}</span>`;
+      }
+      contextContainer.appendChild(ctxDiv);
+    });
+    content.appendChild(contextContainer);
+
     const actions = document.createElement("div");
     actions.className = "inbox-item-actions";
+    actions.appendChild(makeContextBtn(text, div));
     actions.appendChild(makeCopyBtn(mainText));
     actions.appendChild(makeDeleteBtn(text, div));
 
@@ -294,7 +389,7 @@
         return;
       }
       // Add the new item to the feed
-      appendInboxItem(data.item.replace(/^- /, ""));
+      appendInboxItem({ text: data.item.replace(/^- /, ""), contexts: [] });
       inboxInput.value = "";
     } catch (e) {
       alert("Kon item niet toevoegen");
@@ -623,7 +718,7 @@
         if (localUrl) {
           appendInboxImage(localUrl, file.name, result.entry);
         } else {
-          appendInboxItem(result.entry.replace(/^- /, ""));
+          appendInboxItem({ text: result.entry.replace(/^- /, ""), contexts: [] });
         }
         clearUploadPreview();
       }
@@ -636,7 +731,7 @@
           alert("Fout: " + data.error);
           return;
         }
-        appendInboxItem(data.item.replace(/^- /, ""));
+        appendInboxItem({ text: data.item.replace(/^- /, ""), contexts: [] });
         inboxInput.value = "";
       }
     } catch (e) {
