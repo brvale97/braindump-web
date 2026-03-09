@@ -323,12 +323,41 @@ export async function onRequestPut(context) {
   }
 }
 
-// PATCH: add context to an overview item
+// PATCH: add context to an overview item, or edit item text
 export async function onRequestPatch(context) {
   try {
-    const { category, itemText, context: ctxText } = await context.request.json();
-    if (!category || !itemText || !ctxText || !ctxText.trim()) {
-      return Response.json({ error: "category, itemText en context zijn vereist" }, { status: 400 });
+    const body = await context.request.json();
+    const { category, itemText, context: ctxText, newText } = body;
+
+    if (!category || !itemText) {
+      return Response.json({ error: "category en itemText zijn vereist" }, { status: 400 });
+    }
+
+    // Edit mode: replace item text
+    if (newText && newText.trim()) {
+      const found = await findItemInCategory(context.env, category, itemText);
+      if (!found) {
+        return Response.json({ error: "Item niet gevonden" }, { status: 404 });
+      }
+
+      const lines = found.file.content.split("\n");
+      const oldLine = lines[found.lineIndex];
+      const prefix = oldLine.match(/^(\s*[-*]\s*)/)[1];
+      // Preserve original date prefix if present
+      const dateMatch = oldLine.slice(prefix.length).match(/^(\[\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?\]\s*)/);
+      const datePrefix = dateMatch ? dateMatch[1] : "";
+      lines[found.lineIndex] = `${prefix}${datePrefix}${newText.trim()}`;
+
+      const newContent = lines.join("\n");
+      await updateFile(context.env, found.file.path, newContent, found.file.sha,
+        `web: edit "${itemText.slice(0, 30)}" → "${newText.trim().slice(0, 30)}"`);
+
+      return Response.json({ success: true });
+    }
+
+    // Context mode: add context sub-item
+    if (!ctxText || !ctxText.trim()) {
+      return Response.json({ error: "context of newText is vereist" }, { status: 400 });
     }
 
     const found = await findItemInCategory(context.env, category, itemText);

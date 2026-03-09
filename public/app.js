@@ -465,6 +465,79 @@
   }
 
   const moveSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>';
+  const editSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+
+  function makeEditBtn(category, itemText, row) {
+    const btn = document.createElement("button");
+    btn.className = "edit-btn";
+    btn.innerHTML = editSvg;
+    btn.title = "Bewerken";
+    btn.addEventListener("click", () => {
+      let wrap = row.querySelector(".edit-input-wrap");
+      if (wrap) {
+        wrap.remove();
+        return;
+      }
+      wrap = document.createElement("div");
+      wrap.className = "edit-input-wrap";
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = itemText;
+      const saveBtn = document.createElement("button");
+      saveBtn.textContent = "Opslaan";
+
+      async function submitEdit() {
+        const newText = input.value.trim();
+        if (!newText || newText === itemText) {
+          wrap.remove();
+          return;
+        }
+        input.disabled = true;
+        saveBtn.disabled = true;
+        try {
+          const data = await api("/api/overview", {
+            method: "PATCH",
+            body: JSON.stringify({ category, itemText, newText }),
+          });
+          if (data.error) {
+            alert("Fout: " + data.error);
+            input.disabled = false;
+            saveBtn.disabled = false;
+            return;
+          }
+          // Update the displayed text
+          const mainEl = row.querySelector(".item-main");
+          mainEl.innerHTML = renderMarkdown(newText);
+          // Update button references to new text
+          row.querySelectorAll(".copy-btn").forEach(b => {
+            b.onclick = () => {
+              navigator.clipboard.writeText(newText);
+              b.classList.add("copied");
+              setTimeout(() => b.classList.remove("copied"), 1500);
+            };
+          });
+          wrap.remove();
+        } catch (e) {
+          alert("Kon item niet bewerken");
+          input.disabled = false;
+          saveBtn.disabled = false;
+        }
+      }
+
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") submitEdit();
+        if (e.key === "Escape") wrap.remove();
+      });
+      saveBtn.addEventListener("click", submitEdit);
+
+      wrap.appendChild(input);
+      wrap.appendChild(saveBtn);
+      row.querySelector(".item-text").appendChild(wrap);
+      input.focus();
+      input.select();
+    });
+    return btn;
+  }
 
   function makeMoveBtn(category, itemText, row) {
     const wrap = document.createElement("div");
@@ -643,6 +716,7 @@
 
         row.appendChild(circle);
         row.appendChild(textWrap);
+        row.appendChild(makeEditBtn(category, parsed.text, row));
         row.appendChild(makeOverviewContextBtn(category, parsed.text, row));
         row.appendChild(makeMoveBtn(category, parsed.text, row));
         row.appendChild(makeCopyBtn(parsed.text));
