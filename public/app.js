@@ -22,7 +22,7 @@
 
   let overviewData = {};
   let activeCategory = "alles";
-  let pendingFile = null;
+  let pendingFiles = [];
   let sortNewest = false;
 
   const categoryLabels = {
@@ -803,32 +803,55 @@
   const attachBtn = document.getElementById("attach-btn");
   const uploadPreview = document.getElementById("upload-preview");
 
-  function showUploadPreview(file) {
-    pendingFile = file;
+  function addFilesToPreview(files) {
+    for (const file of files) {
+      if (file.size > MAX_FILE_SIZE) {
+        alert(`${file.name} is te groot (max 10MB)`);
+        continue;
+      }
+      pendingFiles.push(file);
+    }
+    renderUploadPreview();
+  }
+
+  function renderUploadPreview() {
     uploadPreview.innerHTML = "";
+    if (pendingFiles.length === 0) {
+      uploadPreview.classList.add("hidden");
+      return;
+    }
     uploadPreview.classList.remove("hidden");
 
-    if (file.type.startsWith("image/")) {
-      const img = document.createElement("img");
-      img.src = URL.createObjectURL(file);
-      uploadPreview.appendChild(img);
-    } else {
-      const name = document.createElement("span");
-      name.className = "file-name";
-      name.textContent = file.name;
-      uploadPreview.appendChild(name);
-    }
+    pendingFiles.forEach((file, i) => {
+      const item = document.createElement("div");
+      item.className = "upload-preview-item";
 
-    const remove = document.createElement("button");
-    remove.className = "remove";
-    remove.textContent = "\u00D7";
-    remove.title = "Verwijderen";
-    remove.addEventListener("click", clearUploadPreview);
-    uploadPreview.appendChild(remove);
+      if (file.type.startsWith("image/")) {
+        const img = document.createElement("img");
+        img.src = URL.createObjectURL(file);
+        item.appendChild(img);
+      } else {
+        const name = document.createElement("span");
+        name.className = "file-name";
+        name.textContent = file.name;
+        item.appendChild(name);
+      }
+
+      const remove = document.createElement("button");
+      remove.className = "remove";
+      remove.textContent = "\u00D7";
+      remove.title = "Verwijderen";
+      remove.addEventListener("click", () => {
+        pendingFiles.splice(i, 1);
+        renderUploadPreview();
+      });
+      item.appendChild(remove);
+      uploadPreview.appendChild(item);
+    });
   }
 
   function clearUploadPreview() {
-    pendingFile = null;
+    pendingFiles = [];
     uploadPreview.classList.add("hidden");
     uploadPreview.innerHTML = "";
     fileInput.value = "";
@@ -862,16 +885,16 @@
 
   async function handleSend() {
     const text = inboxInput.value.trim();
-    const file = pendingFile;
+    const files = [...pendingFiles];
 
-    if (!text && !file) return;
+    if (!text && files.length === 0) return;
 
     inboxSend.disabled = true;
     inboxInput.disabled = true;
     attachBtn.disabled = true;
 
     try {
-      if (file) {
+      for (const file of files) {
         const localUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
         const result = await uploadFile(file);
         if (localUrl) {
@@ -879,8 +902,8 @@
         } else {
           appendInboxItem({ text: result.entry.replace(/^- /, ""), contexts: [] });
         }
-        clearUploadPreview();
       }
+      if (files.length > 0) clearUploadPreview();
       if (text) {
         const data = await api("/api/inbox", {
           method: "POST",
@@ -942,26 +965,16 @@
   dropZone.addEventListener("drop", (e) => {
     e.preventDefault();
     dropZone.classList.remove("drag-over");
-    const file = e.dataTransfer.files[0];
-    if (!file) return;
-    if (file.size > MAX_FILE_SIZE) {
-      alert("Bestand is te groot (max 10MB)");
-      return;
-    }
-    showUploadPreview(file);
+    if (e.dataTransfer.files.length === 0) return;
+    addFilesToPreview(e.dataTransfer.files);
   });
 
   attachBtn.addEventListener("click", () => fileInput.click());
 
   fileInput.addEventListener("change", () => {
-    const file = fileInput.files[0];
-    if (!file) return;
-    if (file.size > MAX_FILE_SIZE) {
-      alert("Bestand is te groot (max 10MB)");
-      fileInput.value = "";
-      return;
-    }
-    showUploadPreview(file);
+    if (fileInput.files.length === 0) return;
+    addFilesToPreview(fileInput.files);
+    fileInput.value = "";
   });
 
   inboxSend.addEventListener("click", handleSend);
