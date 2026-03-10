@@ -920,11 +920,77 @@ body {
   line-height: 1;
 }
 
-/* Drag & drop */
+/* Drag & drop (inbox file upload) */
 .tab-content.drag-over {
   outline: 2px dashed var(--accent);
   outline-offset: -4px;
   background: rgba(218, 123, 59, 0.04);
+}
+
+/* Drag & drop reorder */
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  min-width: 20px;
+  color: var(--border);
+  cursor: grab;
+  flex-shrink: 0;
+  align-self: center;
+  touch-action: none;
+  opacity: 0;
+  transition: opacity 0.2s, color 0.2s;
+  margin-left: -0.5rem;
+  margin-right: -0.25rem;
+}
+
+.overview-item:hover .drag-handle {
+  opacity: 1;
+}
+
+.drag-handle:hover {
+  color: var(--text-muted);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+@media (hover: none) {
+  .drag-handle {
+    opacity: 0.35;
+  }
+}
+
+.overview-item.dragging {
+  opacity: 0.4;
+  background: var(--surface2);
+}
+
+.drag-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drop-indicator {
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  margin: 0 1.25rem;
+  pointer-events: none;
+  transition: opacity 0.1s;
 }
 
 /* Scrollbar styling */

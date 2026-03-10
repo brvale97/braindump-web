@@ -323,11 +323,124 @@ export async function onRequestPut(context) {
   }
 }
 
-// PATCH: add context to an overview item, or edit item text
+// PATCH: add context to an overview item, edit item text, or reorder items
 export async function onRequestPatch(context) {
   try {
     const body = await context.request.json();
-    const { category, itemText, context: ctxText, newText } = body;
+    const { category, itemText, context: ctxText, newText, action, orderedItems } = body;
+
+    // Reorder mode
+    if (action === "reorder") {
+      if (!category || !orderedItems || !Array.isArray(orderedItems)) {
+        return Response.json({ error: "category en orderedItems zijn vereist" }, { status: 400 });
+      }
+      const sortedPath = SORTED_FILES[category];
+      if (!sortedPath || sortedPath.endsWith("/")) {
+        return Response.json({ error: "Categorie ondersteunt geen herschikken" }, { status: 400 });
+      }
+
+      const file = await getFileWithSha(context.env, sortedPath);
+      if (!file) {
+        return Response.json({ error: "Bestand niet gevonden" }, { status: 404 });
+      }
+
+      const lines = file.content.split("\n");
+
+      // Build blocks: each item = main line + its indented sub-items
+      const blocks = []; // { key, lines[] }
+      const preamble = []; // lines before first item (headers, blank lines)
+      let currentBlock = null;
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        const indent = line.length - line.trimStart().length;
+
+        if (indent >= 2 && (trimmed.startsWith("- ") || trimmed.startsWith("* ")) && currentBlock) {
+          // Sub-item of current block
+          currentBlock.lines.push(line);
+        } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+          // New top-level item
+          const text = trimmed.slice(2);
+          if (text.includes("~~") || text.startsWith("[x]") || text.startsWith("[X]")) {
+            // Done item — keep in preamble/tail (won't be reordered)
+            if (currentBlock) {
+              blocks.push(currentBlock);
+              currentBlock = null;
+            }
+            blocks.push({ key: null, lines: [line] });
+            continue;
+          }
+          if (currentBlock) blocks.push(currentBlock);
+          // Compute key: strip date prefix and [ ] checkbox
+          let key = text.replace(/^\[\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?\]\s*/, "");
+          if (key.startsWith("[ ] ")) key = key.slice(4);
+          currentBlock = { key, lines: [line] };
+        } else if (trimmed.startsWith("#")) {
+          // Header line
+          if (currentBlock) {
+            blocks.push(currentBlock);
+            currentBlock = null;
+          }
+          blocks.push({ key: null, lines: [line] });
+        } else {
+          // Blank lines or other content
+          if (currentBlock) {
+            // Could be blank line inside a block — attach to current
+            currentBlock.lines.push(line);
+          } else {
+            blocks.push({ key: null, lines: [line] });
+          }
+        }
+      }
+      if (currentBlock) blocks.push(currentBlock);
+
+      // Separate reorderable blocks from fixed (headers, done items, etc)
+      const fixed = []; // { index, block }
+      const reorderable = []; // { key, block }
+      blocks.forEach((block, i) => {
+        if (block.key) {
+          reorderable.push(block);
+        } else {
+          fixed.push({ index: i, block });
+        }
+      });
+
+      // Reorder based on orderedItems
+      const ordered = [];
+      const used = new Set();
+      for (const itemText of orderedItems) {
+        const idx = reorderable.findIndex((b, i) => !used.has(i) && b.key === itemText);
+        if (idx !== -1) {
+          ordered.push(reorderable[idx]);
+          used.add(idx);
+        }
+      }
+      // Append any items not in orderedItems (shouldn't happen, but safe)
+      reorderable.forEach((b, i) => {
+        if (!used.has(i)) ordered.push(b);
+      });
+
+      // Reconstruct: fixed blocks stay in place, reorderable fill in order
+      const result = [];
+      let orderedIdx = 0;
+      for (let i = 0; i < blocks.length; i++) {
+        const fixedBlock = fixed.find((f) => f.index === i);
+        if (fixedBlock) {
+          result.push(...fixedBlock.block.lines);
+        } else {
+          if (orderedIdx < ordered.length) {
+            result.push(...ordered[orderedIdx].lines);
+            orderedIdx++;
+          }
+        }
+      }
+
+      const newContent = result.join("\n");
+      await updateFile(context.env, file.path, newContent, file.sha,
+        `web: reorder ${category}`);
+
+      return Response.json({ success: true });
+    }
 
     if (!category || !itemText) {
       return Response.json({ error: "category en itemText zijn vereist" }, { status: 400 });

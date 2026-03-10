@@ -464,6 +464,8 @@
     }
   }
 
+  const gripSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>';
+
   const moveSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>';
   const editSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
 
@@ -714,12 +716,22 @@
         });
         textWrap.appendChild(contextContainer);
 
+        // Drag handle (hidden for sort-by-date and "alles" tab)
+        const handle = document.createElement("div");
+        handle.className = "drag-handle";
+        handle.innerHTML = gripSvg;
+        if (sortNewest || activeCategory === "alles") {
+          handle.classList.add("hidden");
+        }
+        row.appendChild(handle);
         row.appendChild(circle);
         row.appendChild(textWrap);
         row.appendChild(makeEditBtn(category, parsed.text, row));
         row.appendChild(makeOverviewContextBtn(category, parsed.text, row));
         row.appendChild(makeMoveBtn(category, parsed.text, row));
         row.appendChild(makeCopyBtn(parsed.text));
+        // Store item text for reorder
+        row.dataset.itemText = parsed.text;
         card.appendChild(row);
       }
     });
@@ -997,6 +1009,171 @@
 
   refreshBtn.addEventListener("click", loadOverview);
   inboxRefreshBtn.addEventListener("click", loadInbox);
+
+  // --- Drag & Drop Reorder ---
+
+  let dragState = null;
+
+  function initDrag(e, handle) {
+    const row = handle.closest(".overview-item");
+    const card = row.closest(".overview-card");
+    if (!row || !card) return;
+
+    // Only respond to primary pointer
+    if (e.button !== 0) return;
+
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+
+    const rect = row.getBoundingClientRect();
+    const items = [...card.querySelectorAll(".overview-item")];
+    const startIndex = items.indexOf(row);
+
+    // Create ghost
+    const ghost = document.createElement("div");
+    ghost.className = "drag-ghost";
+    ghost.textContent = row.dataset.itemText || "";
+    ghost.style.left = `${e.clientX + 12}px`;
+    ghost.style.top = `${e.clientY - 16}px`;
+    document.body.appendChild(ghost);
+
+    row.classList.add("dragging");
+
+    dragState = {
+      row,
+      card,
+      ghost,
+      startIndex,
+      currentIndex: startIndex,
+      pointerId: e.pointerId,
+      items,
+      indicator: null,
+    };
+  }
+
+  function moveDrag(e) {
+    if (!dragState) return;
+
+    const { ghost, card, row, items } = dragState;
+
+    ghost.style.left = `${e.clientX + 12}px`;
+    ghost.style.top = `${e.clientY - 16}px`;
+
+    // Remove old indicator
+    if (dragState.indicator) {
+      dragState.indicator.remove();
+      dragState.indicator = null;
+    }
+
+    // Find drop target
+    let targetIndex = items.length;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item === row) continue;
+      const rect = item.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      if (e.clientY < midY) {
+        targetIndex = i;
+        break;
+      }
+    }
+
+    // Adjust for dragged item position
+    const startIndex = items.indexOf(row);
+    if (targetIndex > startIndex) targetIndex--;
+
+    dragState.currentIndex = targetIndex;
+
+    // Show drop indicator
+    const indicator = document.createElement("div");
+    indicator.className = "drop-indicator";
+
+    // Insert indicator in the right place
+    const overviewItems = [...card.querySelectorAll(".overview-item")];
+    if (targetIndex < startIndex && overviewItems[targetIndex]) {
+      overviewItems[targetIndex].before(indicator);
+    } else if (overviewItems[targetIndex + (targetIndex >= startIndex ? 1 : 0)]) {
+      overviewItems[targetIndex + (targetIndex >= startIndex ? 1 : 0)].before(indicator);
+    } else {
+      // Append at end
+      const lastItem = overviewItems[overviewItems.length - 1];
+      if (lastItem) lastItem.after(indicator);
+    }
+
+    dragState.indicator = indicator;
+  }
+
+  async function endDrag(e) {
+    if (!dragState) return;
+
+    const { row, ghost, card, startIndex, currentIndex, items, indicator } = dragState;
+
+    row.classList.remove("dragging");
+    ghost.remove();
+    if (indicator) indicator.remove();
+    dragState = null;
+
+    if (startIndex === currentIndex) return;
+
+    // Reorder DOM
+    const overviewItems = [...card.querySelectorAll(".overview-item")];
+    const target = overviewItems[currentIndex + (currentIndex > startIndex ? 1 : 0)];
+    if (target) {
+      target.before(row);
+    } else {
+      // Move to end — find last overview-item and insert after
+      const lastItem = overviewItems[overviewItems.length - 1];
+      if (lastItem && lastItem !== row) lastItem.after(row);
+    }
+
+    // Collect new order
+    const newItems = [...card.querySelectorAll(".overview-item")];
+    const orderedItems = newItems
+      .map((el) => el.dataset.itemText)
+      .filter(Boolean);
+
+    // Send to API
+    try {
+      const data = await api("/api/overview", {
+        method: "PATCH",
+        body: JSON.stringify({
+          action: "reorder",
+          category: activeCategory,
+          orderedItems,
+        }),
+      });
+      if (data.error) {
+        alert("Herschikken mislukt: " + data.error);
+        // Reload to revert
+        loadOverview();
+      }
+    } catch (e) {
+      alert("Herschikken mislukt");
+      loadOverview();
+    }
+  }
+
+  overviewContent.addEventListener("pointerdown", (e) => {
+    const handle = e.target.closest(".drag-handle");
+    if (handle) initDrag(e, handle);
+  });
+
+  overviewContent.addEventListener("pointermove", (e) => {
+    if (dragState) moveDrag(e);
+  });
+
+  overviewContent.addEventListener("pointerup", (e) => {
+    if (dragState) endDrag(e);
+  });
+
+  overviewContent.addEventListener("pointercancel", (e) => {
+    if (dragState) {
+      dragState.row.classList.remove("dragging");
+      dragState.ghost.remove();
+      if (dragState.indicator) dragState.indicator.remove();
+      dragState = null;
+    }
+  });
 
   // --- Helpers ---
 
