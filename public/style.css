@@ -247,12 +247,13 @@ body {
   color: var(--danger);
 }
 
-.inbox-item .context-btn {
+.context-btn {
   opacity: 0;
   transition: opacity 0.2s, color 0.2s;
 }
 
-.inbox-item:hover .context-btn {
+.inbox-item:hover .context-btn,
+.overview-item:hover .context-btn {
   opacity: 1;
 }
 
