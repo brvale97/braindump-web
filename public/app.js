@@ -602,6 +602,7 @@
   // Close move menus on outside click
   document.addEventListener("click", () => {
     document.querySelectorAll(".move-menu").forEach(m => m.classList.add("hidden"));
+    document.querySelectorAll(".item-actions.open").forEach(a => a.classList.remove("open"));
   });
 
   function makeOverviewContextBtn(category, itemText, row) {
@@ -695,13 +696,10 @@
         const mainEl = document.createElement("span");
         mainEl.className = "item-main";
         mainEl.innerHTML = renderMarkdown(parsed.text);
-        textWrap.appendChild(mainEl);
         if (parsed.date) {
-          const dateEl = document.createElement("span");
-          dateEl.className = "item-date";
-          dateEl.textContent = formatDate(parsed.date);
-          textWrap.appendChild(dateEl);
+          mainEl.innerHTML += ` <span class="item-date">&middot; ${escapeHtml(formatDate(parsed.date))}</span>`;
         }
+        textWrap.appendChild(mainEl);
 
         // Context sub-items
         const contextContainer = document.createElement("div");
@@ -726,13 +724,31 @@
         if (sortNewest || activeCategory === "alles") {
           handle.classList.add("hidden");
         }
+        // Action buttons in container
+        const actions = document.createElement("div");
+        actions.className = "item-actions";
+        actions.appendChild(makeEditBtn(category, parsed.text, row));
+        actions.appendChild(makeOverviewContextBtn(category, parsed.text, row));
+        actions.appendChild(makeMoveBtn(category, parsed.text, row));
+        actions.appendChild(makeCopyBtn(parsed.text));
+
+        // More button (visible on touch devices only)
+        const moreBtn = document.createElement("button");
+        moreBtn.className = "more-btn";
+        moreBtn.innerHTML = "&#8942;";
+        moreBtn.title = "Acties";
+        moreBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const wasOpen = actions.classList.contains("open");
+          document.querySelectorAll(".item-actions.open").forEach(a => a.classList.remove("open"));
+          if (!wasOpen) actions.classList.add("open");
+        });
+
         row.appendChild(handle);
         row.appendChild(circle);
         row.appendChild(textWrap);
-        row.appendChild(makeEditBtn(category, parsed.text, row));
-        row.appendChild(makeOverviewContextBtn(category, parsed.text, row));
-        row.appendChild(makeMoveBtn(category, parsed.text, row));
-        row.appendChild(makeCopyBtn(parsed.text));
+        row.appendChild(moreBtn);
+        row.appendChild(actions);
         // Store item text for reorder
         row.dataset.itemText = parsed.text;
         card.appendChild(row);
@@ -1208,7 +1224,7 @@
     e.preventDefault();
     deferredPrompt = e;
     // Don't show if user dismissed before
-    if (!sessionStorage.getItem("install_dismissed")) {
+    if (!localStorage.getItem("install_dismissed")) {
       installBanner.classList.remove("hidden");
     }
   });
@@ -1223,7 +1239,7 @@
 
   installDismiss.addEventListener("click", () => {
     installBanner.classList.add("hidden");
-    sessionStorage.setItem("install_dismissed", "1");
+    localStorage.setItem("install_dismissed", "1");
   });
 
   window.addEventListener("appinstalled", () => {
