@@ -392,6 +392,7 @@
       // Add the new item to the feed
       appendInboxItem({ text: data.item.replace(/^- /, ""), contexts: [] });
       inboxInput.value = "";
+      autoResize(inboxInput);
     } catch (e) {
       alert("Kon item niet toevoegen");
     } finally {
@@ -482,9 +483,11 @@
       }
       wrap = document.createElement("div");
       wrap.className = "edit-input-wrap";
-      const input = document.createElement("input");
-      input.type = "text";
+      const input = document.createElement("textarea");
+      input.rows = 1;
       input.value = itemText;
+      setTimeout(() => autoResize(input), 0);
+      input.addEventListener("input", () => autoResize(input));
       const saveBtn = document.createElement("button");
       saveBtn.textContent = "Opslaan";
 
@@ -527,7 +530,7 @@
       }
 
       input.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") submitEdit();
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitEdit(); }
         if (e.key === "Escape") wrap.remove();
       });
       saveBtn.addEventListener("click", submitEdit);
@@ -927,6 +930,7 @@
         }
         appendInboxItem({ text: data.item.replace(/^- /, ""), contexts: [] });
         inboxInput.value = "";
+        autoResize(inboxInput);
       }
     } catch (e) {
       alert("Fout: " + e.message);
@@ -992,8 +996,13 @@
   inboxSend.addEventListener("click", handleSend);
 
   inboxInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") handleSend();
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   });
+
+  inboxInput.addEventListener("input", () => autoResize(inboxInput));
 
   categoryTabs.forEach((tab) => {
     tab.addEventListener("click", () => renderCategory(tab.dataset.cat));
@@ -1176,6 +1185,11 @@
   });
 
   // --- Helpers ---
+
+  function autoResize(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+  }
 
   function escapeHtml(str) {
     const div = document.createElement("div");

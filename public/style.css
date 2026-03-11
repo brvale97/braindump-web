@@ -368,7 +368,7 @@ body {
   border-color: var(--accent);
 }
 
-.composer input {
+.composer textarea {
   width: 100%;
   padding: 0.75rem 1rem;
   font-size: 0.95rem;
@@ -376,9 +376,15 @@ body {
   background: transparent;
   color: var(--text);
   outline: none;
+  resize: none;
+  overflow-y: hidden;
+  min-height: 1.6em;
+  max-height: 8em;
+  line-height: 1.6;
+  font-family: inherit;
 }
 
-.composer input::placeholder {
+.composer textarea::placeholder {
   color: var(--text-muted);
 }
 
@@ -728,7 +734,7 @@ body {
   width: 100%;
 }
 
-.edit-input-wrap input {
+.edit-input-wrap textarea {
   flex: 1;
   padding: 0.4rem 0.6rem;
   border: 1px solid var(--border);
@@ -736,6 +742,12 @@ body {
   background: var(--bg);
   color: var(--text);
   font-size: 0.9rem;
+  resize: none;
+  overflow-y: hidden;
+  min-height: 1.5em;
+  max-height: 6em;
+  line-height: 1.5;
+  font-family: inherit;
 }
 
 .edit-input-wrap button {
