@@ -538,6 +538,11 @@ body {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   flex: 1;
+  scrollbar-width: none;
+}
+
+.category-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .cat-tab {
@@ -593,14 +598,14 @@ body {
 
 .overview-header-item {
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--text);
-  padding: 0.75rem 1.25rem 0.25rem;
+  padding: 0.5rem 1.25rem 0.15rem;
 }
 
 .overview-header-item.sub-header {
-  padding-left: 2rem;
-  font-size: 0.8rem;
+  padding-left: 1.75rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
 }
 
@@ -666,9 +671,9 @@ body {
 }
 
 .overview-item .item-date {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
-  margin-top: 0.15rem;
+  white-space: nowrap;
 }
 
 .copy-btn {
@@ -823,11 +828,70 @@ body {
   border-top: 1px solid var(--border);
 }
 
+/* Item actions container */
+.item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.more-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: 6px;
+  flex-shrink: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.more-btn:hover {
+  color: var(--text);
+}
+
 @media (hover: none) {
-  .copy-btn,
-  .move-btn,
-  .edit-btn,
-  .overview-item .context-btn {
+  .overview-item {
+    position: relative;
+  }
+
+  .more-btn {
+    display: flex;
+  }
+
+  .overview-item .item-actions {
+    display: none;
+    position: absolute;
+    right: 0.5rem;
+    top: calc(100% - 2px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    z-index: 20;
+    padding: 0.25rem;
+  }
+
+  .overview-item .item-actions.open {
+    display: flex;
+  }
+
+  .item-actions.open .edit-btn,
+  .item-actions.open .context-btn,
+  .item-actions.open .move-btn,
+  .item-actions.open .copy-btn {
+    opacity: 1;
+  }
+
+  /* Inbox action buttons stay visible */
+  .inbox-item .copy-btn,
+  .inbox-item .delete-btn,
+  .inbox-item .context-btn {
     opacity: 0.4;
   }
 }
@@ -971,7 +1035,7 @@ body {
 
 @media (hover: none) {
   .drag-handle {
-    opacity: 0.35;
+    display: none;
   }
 }
 
@@ -1003,6 +1067,32 @@ body {
   margin: 0 1.25rem;
   pointer-events: none;
   transition: opacity 0.1s;
+}
+
+/* Mobile compact layout */
+@media (max-width: 600px) {
+  .overview-item {
+    padding: 0.5rem 0.75rem;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .overview-content {
+    padding: 0.5rem 0.75rem 3rem;
+    gap: 0.75rem;
+  }
+
+  .overview-card {
+    border-radius: 12px;
+  }
+
+  .overview-card-title {
+    padding: 0.5rem 0.75rem 0.25rem;
+  }
+
+  .overview-header-item {
+    padding: 0.4rem 0.75rem 0.1rem;
+  }
 }
 
 /* Scrollbar styling */
