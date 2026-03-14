@@ -923,6 +923,7 @@
     inboxSend.disabled = true;
     inboxInput.disabled = true;
     attachBtn.disabled = true;
+    micBtn.disabled = true;
 
     try {
       for (const file of files) {
@@ -954,6 +955,7 @@
       inboxSend.disabled = false;
       inboxInput.disabled = false;
       attachBtn.disabled = false;
+      micBtn.disabled = false;
       inboxInput.focus();
     }
   }
@@ -1252,7 +1254,157 @@
     navigator.serviceWorker.register("/sw.js");
   }
 
+  // --- Settings ---
+
+  const GROQ_KEY = "braindump_groq_key";
+  const settingsBtn = document.getElementById("settings-btn");
+  const settingsModal = document.getElementById("settings-modal");
+  const settingsClose = document.getElementById("settings-close");
+  const groqKeyInput = document.getElementById("groq-key-input");
+  const groqKeySave = document.getElementById("groq-key-save");
+  const groqKeyStatus = document.getElementById("groq-key-status");
+  const micBtn = document.getElementById("mic-btn");
+
+  function updateMicVisibility() {
+    const hasKey = !!localStorage.getItem(GROQ_KEY);
+    micBtn.classList.toggle("hidden", !hasKey);
+  }
+
+  settingsBtn.addEventListener("click", () => {
+    const key = localStorage.getItem(GROQ_KEY) || "";
+    groqKeyInput.value = key;
+    groqKeyStatus.classList.add("hidden");
+    settingsModal.classList.remove("hidden");
+    groqKeyInput.focus();
+  });
+
+  function closeSettings() {
+    settingsModal.classList.add("hidden");
+  }
+
+  settingsClose.addEventListener("click", closeSettings);
+  settingsModal.addEventListener("click", (e) => {
+    if (e.target === settingsModal) closeSettings();
+  });
+
+  groqKeySave.addEventListener("click", () => {
+    const key = groqKeyInput.value.trim();
+    if (key) {
+      localStorage.setItem(GROQ_KEY, key);
+      groqKeyStatus.textContent = "Key opgeslagen";
+    } else {
+      localStorage.removeItem(GROQ_KEY);
+      groqKeyStatus.textContent = "Key verwijderd";
+    }
+    groqKeyStatus.classList.remove("hidden");
+    updateMicVisibility();
+    setTimeout(closeSettings, 800);
+  });
+
+  groqKeyInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") groqKeySave.click();
+    if (e.key === "Escape") closeSettings();
+  });
+
+  // --- Speech-to-Text ---
+
+  let mediaRecorder = null;
+  let audioChunks = [];
+
+  micBtn.addEventListener("click", async () => {
+    if (mediaRecorder && mediaRecorder.state === "recording") {
+      mediaRecorder.stop();
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunks = [];
+
+      // Use webm/opus if supported, fallback to default
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : "";
+
+      mediaRecorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+
+      mediaRecorder.addEventListener("dataavailable", (e) => {
+        if (e.data.size > 0) audioChunks.push(e.data);
+      });
+
+      mediaRecorder.addEventListener("stop", async () => {
+        // Stop all tracks
+        stream.getTracks().forEach((t) => t.stop());
+        micBtn.classList.remove("recording");
+
+        if (audioChunks.length === 0) return;
+
+        const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+        micBtn.disabled = true;
+
+        try {
+          const transcript = await transcribeAudio(blob);
+          if (transcript) {
+            inboxInput.value = (inboxInput.value ? inboxInput.value + " " : "") + transcript;
+            inboxInput.focus();
+          }
+        } catch (e) {
+          alert("Transcriptie mislukt: " + e.message);
+        } finally {
+          micBtn.disabled = false;
+          mediaRecorder = null;
+        }
+      });
+
+      mediaRecorder.start();
+      micBtn.classList.add("recording");
+    } catch (e) {
+      alert("Microfoon niet beschikbaar: " + e.message);
+    }
+  });
+
+  async function transcribeAudio(blob) {
+    const groqKey = localStorage.getItem(GROQ_KEY);
+    if (!groqKey) throw new Error("Geen Groq API key ingesteld");
+
+    const token = getToken();
+    if (!token) {
+      showLogin();
+      throw new Error("Niet ingelogd");
+    }
+
+    const formData = new FormData();
+    // Determine file extension from mime type
+    const ext = blob.type.includes("webm") ? "webm" : blob.type.includes("mp4") ? "mp4" : "ogg";
+    formData.append("file", blob, `audio.${ext}`);
+    formData.append("model", "whisper-large-v3");
+    formData.append("language", "nl");
+
+    const res = await fetch("/api/transcribe", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "X-Groq-Key": groqKey,
+      },
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Transcriptie mislukt");
+    }
+
+    const data = await res.json();
+    return data.text || "";
+  }
+
   // --- Init ---
+
+  updateMicVisibility();
 
   if (getToken()) {
     showApp();

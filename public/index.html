@@ -31,6 +31,9 @@
       <nav class="tabs">
         <button class="tab active" data-tab="inbox">Braindump</button>
         <button class="tab" data-tab="overview">Overzicht</button>
+        <button id="settings-btn" class="settings-btn" title="Instellingen">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
       </nav>
 
       <!-- Inbox tab -->
@@ -51,9 +54,14 @@
               <button id="attach-btn" class="attach-btn" title="Bestand toevoegen">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               </button>
-              <button id="inbox-send">
+              <div class="composer-right">
+                <button id="mic-btn" class="mic-btn hidden" title="Spraak invoer">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                </button>
+                <button id="inbox-send">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
               </button>
+              </div>
             </div>
           </div>
         </div>
@@ -90,6 +98,25 @@
     <div class="install-actions">
       <button id="install-btn">Installeren</button>
       <button id="install-dismiss" class="dismiss">&times;</button>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Instellingen</h2>
+        <button id="settings-close" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label class="settings-label" for="groq-key-input">Groq API Key</label>
+        <p class="settings-hint">Voor spraak-naar-tekst (Whisper). Haal een key op bij <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a></p>
+        <div class="settings-key-row">
+          <input type="password" id="groq-key-input" placeholder="gsk_..." autocomplete="off">
+          <button id="groq-key-save" class="settings-save-btn">Opslaan</button>
+        </div>
+        <p id="groq-key-status" class="settings-status hidden"></p>
+      </div>
     </div>
   </div>
 
