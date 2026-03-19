@@ -15,11 +15,24 @@ export async function onRequest(context) {
 
   const token = authHeader.slice(7);
   const parts = token.split(".");
-  if (parts.length !== 3) {
+
+  // Support both old 3-part tokens and new 4-part tokens (with role)
+  if (parts.length !== 3 && parts.length !== 4) {
     return Response.json({ error: "Ongeldig token" }, { status: 401 });
   }
 
-  const [tokenData, expiryStr, sigHex] = parts;
+  let tokenData, expiryStr, role, sigHex, payload;
+
+  if (parts.length === 4) {
+    [tokenData, expiryStr, role, sigHex] = parts;
+    payload = `${tokenData}.${expiryStr}.${role}`;
+  } else {
+    // Legacy 3-part token (always bram)
+    [tokenData, expiryStr, sigHex] = parts;
+    role = "bram";
+    payload = `${tokenData}.${expiryStr}`;
+  }
+
   const expiry = parseInt(expiryStr, 10);
 
   // Check expiry
@@ -30,7 +43,6 @@ export async function onRequest(context) {
   // Verify signature
   try {
     const encoder = new TextEncoder();
-    const payload = `${tokenData}.${expiryStr}`;
     const key = await crypto.subtle.importKey(
       "raw",
       encoder.encode(env.SESSION_SECRET),
@@ -49,6 +61,10 @@ export async function onRequest(context) {
   } catch {
     return Response.json({ error: "Token verificatie mislukt" }, { status: 401 });
   }
+
+  // Store role in context for downstream handlers
+  context.data = context.data || {};
+  context.data.user = role;
 
   return next();
 }

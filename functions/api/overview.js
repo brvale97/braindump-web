@@ -1,3 +1,12 @@
+// Access guard: only bram can access overview
+function guardBram(context) {
+  const role = context.data && context.data.user;
+  if (role && role !== "bram") {
+    return Response.json({ error: "Geen toegang" }, { status: 403 });
+  }
+  return null;
+}
+
 const REPO_OWNER = "brvale97";
 const REPO_NAME = "braindump-bram";
 const BRANCH = "main";
@@ -148,6 +157,8 @@ async function updateFile(env, filePath, content, sha, message) {
 
 // POST: mark item as done
 export async function onRequestPost(context) {
+  const denied = guardBram(context);
+  if (denied) return denied;
   try {
     const { category, itemText } = await context.request.json();
     if (!category || !itemText) {
@@ -258,6 +269,8 @@ async function findItemInCategory(env, category, itemText) {
 
 // PUT: move item to different category
 export async function onRequestPut(context) {
+  const denied = guardBram(context);
+  if (denied) return denied;
   try {
     const { fromCategory, toCategory, itemText } = await context.request.json();
     if (!fromCategory || !toCategory || !itemText) {
@@ -325,6 +338,8 @@ export async function onRequestPut(context) {
 
 // PATCH: add context to an overview item, edit item text, or reorder items
 export async function onRequestPatch(context) {
+  const denied = guardBram(context);
+  if (denied) return denied;
   try {
     const body = await context.request.json();
     const { category, itemText, context: ctxText, newText, action, orderedItems } = body;
@@ -516,6 +531,8 @@ export async function onRequestPatch(context) {
 }
 
 export async function onRequestGet(context) {
+  const denied = guardBram(context);
+  if (denied) return denied;
   try {
     const categories = {};
 

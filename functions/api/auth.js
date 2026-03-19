@@ -7,18 +7,26 @@ export async function onRequestPost(context) {
       return Response.json({ error: "PIN is vereist" }, { status: 400 });
     }
 
-    // Hash the provided PIN and compare with stored hash
+    // Hash the provided PIN and compare with stored hashes
     const encoder = new TextEncoder();
     const data = encoder.encode(pin);
     const hashBuffer = await crypto.subtle.digest("SHA-256", data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 
-    if (hashHex !== env.PIN_HASH) {
+    // Determine role based on which PIN matches
+    let role = null;
+    if (hashHex === env.PIN_HASH) {
+      role = "bram";
+    } else if (env.ANNA_PIN_HASH && hashHex === env.ANNA_PIN_HASH) {
+      role = "anna";
+    }
+
+    if (!role) {
       return Response.json({ error: "Ongeldige PIN" }, { status: 401 });
     }
 
-    // Generate session token: random bytes + expiry timestamp (24h)
+    // Generate session token: random bytes + expiry timestamp (24h) + role
     const expiry = Date.now() + 24 * 60 * 60 * 1000;
     const randomBytes = new Uint8Array(32);
     crypto.getRandomValues(randomBytes);
@@ -26,8 +34,8 @@ export async function onRequestPost(context) {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
 
-    // Sign the token with SESSION_SECRET
-    const payload = `${tokenData}.${expiry}`;
+    // Sign the token with SESSION_SECRET (role is included in signature)
+    const payload = `${tokenData}.${expiry}.${role}`;
     const key = await crypto.subtle.importKey(
       "raw",
       encoder.encode(env.SESSION_SECRET),
@@ -42,7 +50,7 @@ export async function onRequestPost(context) {
 
     const token = `${payload}.${sigHex}`;
 
-    return Response.json({ token, expiry });
+    return Response.json({ token, expiry, role });
   } catch (e) {
     return Response.json({ error: "Server error" }, { status: 500 });
   }

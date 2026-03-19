@@ -1,6 +1,9 @@
 (function () {
   const TOKEN_KEY = "braindump_token";
   const EXPIRY_KEY = "braindump_expiry";
+  const ROLE_KEY = "braindump_role";
+  const SHARED_LAST_VISITED_KEY = "braindump_shared_last_visited";
+  const SHARED_LAST_ITEM_TS_KEY = "braindump_shared_last_item_ts";
 
   // Elements
   const loginScreen = document.getElementById("login-screen");
@@ -20,10 +23,19 @@
   const inboxRefreshBtn = document.getElementById("inbox-refresh-btn");
   const fileInput = document.getElementById("file-input");
 
+  // Shared tab elements
+  const sharedFeed = document.getElementById("shared-feed");
+  const sharedLoading = document.getElementById("shared-loading");
+  const sharedInput = document.getElementById("shared-input");
+  const sharedSend = document.getElementById("shared-send");
+  const sharedRefreshBtn = document.getElementById("shared-refresh-btn");
+
   let overviewData = {};
   let activeCategory = "alles";
   let pendingFiles = [];
   let sortNewest = false;
+  let sharedPollTimer = null;
+  let sharedLoaded = false;
 
   const categoryLabels = {
     werk: "GEP",
@@ -41,6 +53,7 @@
     if (!token || !expiry || Date.now() > parseInt(expiry, 10)) {
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(EXPIRY_KEY);
+      localStorage.removeItem(ROLE_KEY);
       return null;
     }
     return token;
@@ -49,6 +62,10 @@
   function setToken(token, expiry) {
     localStorage.setItem(TOKEN_KEY, token);
     localStorage.setItem(EXPIRY_KEY, String(expiry));
+  }
+
+  function getRole() {
+    return localStorage.getItem(ROLE_KEY) || "bram";
   }
 
   async function api(path, options = {}) {
@@ -65,6 +82,7 @@
     if (res.status === 401) {
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(EXPIRY_KEY);
+      localStorage.removeItem(ROLE_KEY);
       showLogin();
       throw new Error("Sessie verlopen");
     }
@@ -85,6 +103,7 @@
         return;
       }
       setToken(data.token, data.expiry);
+      localStorage.setItem(ROLE_KEY, data.role || "bram");
       showApp();
     } catch (e) {
       pinError.textContent = "Verbinding mislukt";
@@ -102,12 +121,38 @@
     pinInput.value = "";
     pinInput.focus();
     overviewData = {};
+    sharedLoaded = false;
+    if (sharedPollTimer) { clearInterval(sharedPollTimer); sharedPollTimer = null; }
   }
 
   function showApp() {
     loginScreen.classList.add("hidden");
     appScreen.classList.remove("hidden");
-    loadInbox();
+
+    const role = getRole();
+    const inboxTab = document.querySelector('.tab[data-tab="inbox"]');
+    const overviewTab = document.querySelector('.tab[data-tab="overview"]');
+    const sharedTab = document.querySelector('.tab[data-tab="shared"]');
+
+    if (role === "anna") {
+      // Anna only sees the shared tab
+      inboxTab.classList.add("hidden");
+      overviewTab.classList.add("hidden");
+      sharedTab.classList.remove("hidden");
+
+      // Activate shared tab
+      tabs.forEach((t) => t.classList.remove("active"));
+      sharedTab.classList.add("active");
+      document.querySelectorAll(".tab-content").forEach((c) => c.classList.add("hidden"));
+      document.getElementById("tab-shared").classList.remove("hidden");
+      loadShared();
+    } else {
+      // Bram sees all tabs
+      inboxTab.classList.remove("hidden");
+      overviewTab.classList.remove("hidden");
+      sharedTab.classList.remove("hidden");
+      loadInbox();
+    }
   }
 
   // --- Inbox ---
@@ -978,6 +1023,18 @@
       if (tab.dataset.tab === "overview" && Object.keys(overviewData).length === 0) {
         loadOverview();
       }
+
+      if (tab.dataset.tab === "shared") {
+        if (!sharedLoaded) loadShared();
+        // Record visit time for notification dot (Bram only)
+        if (getRole() === "bram") {
+          localStorage.setItem(SHARED_LAST_VISITED_KEY, String(Date.now()));
+          updateSharedNotificationDot();
+        }
+        startSharedPolling();
+      } else {
+        stopSharedPolling();
+      }
     });
   });
 
@@ -1402,12 +1459,384 @@
     return data.text || "";
   }
 
+  // --- Shared Tab ---
+
+  async function loadShared() {
+    sharedLoading.classList.remove("hidden");
+    try {
+      const data = await api("/api/shared");
+      sharedLoading.classList.add("hidden");
+      sharedLoaded = true;
+      renderShared(data.items || []);
+      // Update notification dot tracking
+      if (data.items && data.items.length > 0) {
+        const latestTs = extractLatestTimestamp(data.items);
+        if (latestTs) {
+          localStorage.setItem(SHARED_LAST_ITEM_TS_KEY, latestTs);
+        }
+      }
+      // If Bram is currently viewing shared tab, update last visited
+      const activeTab = document.querySelector(".tab.active");
+      if (getRole() === "bram" && activeTab && activeTab.dataset.tab === "shared") {
+        localStorage.setItem(SHARED_LAST_VISITED_KEY, String(Date.now()));
+        updateSharedNotificationDot();
+      }
+    } catch {
+      sharedLoading.textContent = "Laden mislukt";
+    }
+  }
+
+  function extractLatestTimestamp(items) {
+    // Find the latest timestamp from shared items to track new items
+    let latest = "";
+    for (const item of items) {
+      const text = typeof item === "string" ? item : item.text;
+      const tsMatch = text.match(/\*\((.+?)\)\*$/);
+      if (tsMatch && tsMatch[1] > latest) {
+        latest = tsMatch[1];
+      }
+    }
+    return latest;
+  }
+
+  function renderShared(items) {
+    sharedFeed.querySelectorAll(".inbox-item").forEach((el) => el.remove());
+    const emptyEl = sharedFeed.querySelector(".empty");
+    if (emptyEl) emptyEl.remove();
+
+    if (items.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "Gedeelde lijst is leeg";
+      sharedFeed.appendChild(empty);
+      return;
+    }
+
+    items.forEach((item) => {
+      if (typeof item === "string") {
+        appendSharedItem({ text: item, contexts: [] });
+      } else {
+        appendSharedItem(item);
+      }
+    });
+
+    sharedFeed.scrollTop = sharedFeed.scrollHeight;
+  }
+
+  function appendSharedItem(itemObj) {
+    const emptyEl = sharedFeed.querySelector(".empty");
+    if (emptyEl) emptyEl.remove();
+
+    const text = typeof itemObj === "string" ? itemObj : itemObj.text;
+    const contexts = (typeof itemObj === "object" && itemObj.contexts) || [];
+
+    const div = document.createElement("div");
+    div.className = "inbox-item";
+
+    // Extract author tag [Author]
+    const authorMatch = text.match(/^\[(\w+)\]\s*/);
+    const author = authorMatch ? authorMatch[1] : null;
+    const textWithoutAuthor = authorMatch ? text.slice(authorMatch[0].length) : text;
+
+    // Extract timestamp
+    const tsMatch = textWithoutAuthor.match(/\*\((.+?)\)\*$/);
+    const mainText = tsMatch ? textWithoutAuthor.replace(/\s*\*\(.+?\)\*$/, "") : textWithoutAuthor;
+
+    const content = document.createElement("div");
+    content.className = "inbox-item-content";
+
+    // Author badge
+    if (author) {
+      const badge = document.createElement("span");
+      badge.className = "author-badge author-" + author.toLowerCase();
+      badge.textContent = author;
+      content.appendChild(badge);
+    }
+
+    const textSpan = document.createElement("span");
+    if (tsMatch) {
+      textSpan.innerHTML = `${escapeHtml(mainText)} <span class="timestamp">${escapeHtml(tsMatch[1])}</span>`;
+    } else {
+      textSpan.textContent = mainText;
+    }
+    content.appendChild(textSpan);
+
+    // Context sub-items
+    const contextContainer = document.createElement("div");
+    contextContainer.className = "inbox-contexts";
+    contexts.forEach((ctx) => {
+      const ctxDiv = document.createElement("div");
+      ctxDiv.className = "inbox-context";
+      // Parse author from context too
+      const ctxAuthorMatch = ctx.match(/^\[(\w+)\]\s*/);
+      const ctxAuthor = ctxAuthorMatch ? ctxAuthorMatch[1] : null;
+      const ctxTextNoAuthor = ctxAuthorMatch ? ctx.slice(ctxAuthorMatch[0].length) : ctx;
+      const ctxTsMatch = ctxTextNoAuthor.match(/\*\((.+?)\)\*$/);
+      const ctxText = ctxTsMatch ? ctxTextNoAuthor.replace(/\s*\*\(.+?\)\*$/, "") : ctxTextNoAuthor;
+
+      let inner = "";
+      if (ctxAuthor) {
+        inner += `<span class="author-badge author-${ctxAuthor.toLowerCase()}">${escapeHtml(ctxAuthor)}</span> `;
+      }
+      inner += escapeHtml(ctxText);
+      if (ctxTsMatch) {
+        inner += ` <span class="timestamp">${escapeHtml(ctxTsMatch[1])}</span>`;
+      }
+      ctxDiv.innerHTML = inner;
+      contextContainer.appendChild(ctxDiv);
+    });
+    content.appendChild(contextContainer);
+
+    const actions = document.createElement("div");
+    actions.className = "inbox-item-actions";
+    actions.appendChild(makeSharedContextBtn(text, div));
+    actions.appendChild(makeCopyBtn(mainText));
+    actions.appendChild(makeSharedDeleteBtn(text, div));
+
+    div.appendChild(content);
+    div.appendChild(actions);
+
+    sharedFeed.appendChild(div);
+    sharedFeed.scrollTop = sharedFeed.scrollHeight;
+  }
+
+  function makeSharedDeleteBtn(fullText, itemEl) {
+    const btn = document.createElement("button");
+    btn.className = "delete-btn";
+    btn.innerHTML = deleteSvg;
+    btn.title = "Verwijderen";
+    btn.addEventListener("click", async () => {
+      if (!confirm("Dit item verwijderen?")) return;
+      btn.disabled = true;
+      try {
+        const data = await api("/api/shared", {
+          method: "DELETE",
+          body: JSON.stringify({ item: fullText }),
+        });
+        if (data.error) {
+          alert("Fout: " + data.error);
+          return;
+        }
+        itemEl.style.animation = "none";
+        itemEl.style.transition = "opacity 0.2s, transform 0.2s";
+        itemEl.style.opacity = "0";
+        itemEl.style.transform = "translateX(20px)";
+        setTimeout(() => {
+          itemEl.remove();
+          if (!sharedFeed.querySelector(".inbox-item")) {
+            const empty = document.createElement("div");
+            empty.className = "empty";
+            empty.textContent = "Gedeelde lijst is leeg";
+            sharedFeed.appendChild(empty);
+          }
+        }, 200);
+      } catch (e) {
+        alert("Kon item niet verwijderen");
+        btn.disabled = false;
+      }
+    });
+    return btn;
+  }
+
+  function makeSharedContextBtn(fullText, itemEl) {
+    const btn = document.createElement("button");
+    btn.className = "context-btn";
+    btn.innerHTML = contextSvg;
+    btn.title = "Context toevoegen";
+    btn.addEventListener("click", () => {
+      let wrap = itemEl.querySelector(".context-input-wrap");
+      if (wrap) {
+        wrap.remove();
+        return;
+      }
+      wrap = document.createElement("div");
+      wrap.className = "context-input-wrap";
+      const input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = "Context toevoegen...";
+      const sendBtn = document.createElement("button");
+      sendBtn.textContent = "Toevoegen";
+      sendBtn.className = "context-send-btn";
+
+      async function submitContext() {
+        const val = input.value.trim();
+        if (!val) return;
+        input.disabled = true;
+        sendBtn.disabled = true;
+        try {
+          const data = await api("/api/shared", {
+            method: "PATCH",
+            body: JSON.stringify({ parentItem: fullText, context: val }),
+          });
+          if (data.error) {
+            alert("Fout: " + data.error);
+            return;
+          }
+          const contextContainer = itemEl.querySelector(".inbox-contexts");
+          const ctxDiv = document.createElement("div");
+          ctxDiv.className = "inbox-context";
+          // Parse the returned context for author badge
+          const ctxAuthorMatch = data.context.match(/^\[(\w+)\]\s*/);
+          const ctxAuthor = ctxAuthorMatch ? ctxAuthorMatch[1] : null;
+          const ctxTextNoAuthor = ctxAuthorMatch ? data.context.slice(ctxAuthorMatch[0].length) : data.context;
+          const ctxTsMatch = ctxTextNoAuthor.match(/\*\((.+?)\)\*$/);
+          const ctxText = ctxTsMatch ? ctxTextNoAuthor.replace(/\s*\*\(.+?\)\*$/, "") : ctxTextNoAuthor;
+          let inner = "";
+          if (ctxAuthor) {
+            inner += `<span class="author-badge author-${ctxAuthor.toLowerCase()}">${escapeHtml(ctxAuthor)}</span> `;
+          }
+          inner += escapeHtml(ctxText);
+          if (ctxTsMatch) {
+            inner += ` <span class="timestamp">${escapeHtml(ctxTsMatch[1])}</span>`;
+          }
+          ctxDiv.innerHTML = inner;
+          contextContainer.appendChild(ctxDiv);
+          wrap.remove();
+        } catch (e) {
+          alert("Kon context niet toevoegen");
+          input.disabled = false;
+          sendBtn.disabled = false;
+        }
+      }
+
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") submitContext();
+        if (e.key === "Escape") wrap.remove();
+      });
+      sendBtn.addEventListener("click", submitContext);
+
+      wrap.appendChild(input);
+      wrap.appendChild(sendBtn);
+      itemEl.querySelector(".inbox-item-content").appendChild(wrap);
+      input.focus();
+    });
+    return btn;
+  }
+
+  async function addSharedItem(text) {
+    sharedSend.disabled = true;
+    sharedInput.disabled = true;
+    try {
+      const data = await api("/api/shared", {
+        method: "POST",
+        body: JSON.stringify({ item: text }),
+      });
+      if (data.error) {
+        alert("Fout: " + data.error);
+        return;
+      }
+      appendSharedItem({ text: data.item.replace(/^- /, ""), contexts: [] });
+      sharedInput.value = "";
+      autoResize(sharedInput);
+    } catch (e) {
+      alert("Kon item niet toevoegen");
+    } finally {
+      sharedSend.disabled = false;
+      sharedInput.disabled = false;
+      sharedInput.focus();
+    }
+  }
+
+  sharedSend.addEventListener("click", () => {
+    const text = sharedInput.value.trim();
+    if (text) addSharedItem(text);
+  });
+
+  sharedInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      const text = sharedInput.value.trim();
+      if (text) addSharedItem(text);
+    }
+  });
+
+  sharedInput.addEventListener("input", () => autoResize(sharedInput));
+
+  sharedRefreshBtn.addEventListener("click", loadShared);
+
+  // --- Shared Tab Polling ---
+
+  function startSharedPolling() {
+    stopSharedPolling();
+    sharedPollTimer = setInterval(loadShared, 30000);
+  }
+
+  function stopSharedPolling() {
+    if (sharedPollTimer) {
+      clearInterval(sharedPollTimer);
+      sharedPollTimer = null;
+    }
+  }
+
+  // --- Notification Dot (Bram only) ---
+
+  function updateSharedNotificationDot() {
+    const sharedTab = document.querySelector('.tab[data-tab="shared"]');
+    if (!sharedTab) return;
+
+    const role = getRole();
+    if (role !== "bram") {
+      sharedTab.classList.remove("has-notification");
+      return;
+    }
+
+    const lastVisited = parseInt(localStorage.getItem(SHARED_LAST_VISITED_KEY) || "0", 10);
+    const lastItemTs = localStorage.getItem(SHARED_LAST_ITEM_TS_KEY) || "";
+
+    // If we have a last item timestamp, try to parse it and compare with lastVisited
+    if (lastItemTs) {
+      // Parse Dutch date format: "DD-MM-YYYY HH:MM"
+      const parts = lastItemTs.match(/(\d{2})-(\d{2})-(\d{4})\s+(\d{2}):(\d{2})/);
+      if (parts) {
+        const itemDate = new Date(
+          parseInt(parts[3]),
+          parseInt(parts[2]) - 1,
+          parseInt(parts[1]),
+          parseInt(parts[4]),
+          parseInt(parts[5])
+        );
+        if (itemDate.getTime() > lastVisited) {
+          sharedTab.classList.add("has-notification");
+          return;
+        }
+      }
+    }
+
+    sharedTab.classList.remove("has-notification");
+  }
+
+  // Check notification dot periodically for Bram (when not on shared tab)
+  async function checkSharedNotifications() {
+    if (getRole() !== "bram") return;
+    const activeTab = document.querySelector(".tab.active");
+    if (activeTab && activeTab.dataset.tab === "shared") return;
+
+    try {
+      const data = await api("/api/shared");
+      if (data.items && data.items.length > 0) {
+        const latestTs = extractLatestTimestamp(data.items);
+        if (latestTs) {
+          localStorage.setItem(SHARED_LAST_ITEM_TS_KEY, latestTs);
+          updateSharedNotificationDot();
+        }
+      }
+    } catch {
+      // Silently fail
+    }
+  }
+
   // --- Init ---
 
   updateMicVisibility();
 
   if (getToken()) {
     showApp();
+    // Check for shared notifications after initial load (Bram only)
+    if (getRole() === "bram") {
+      setTimeout(checkSharedNotifications, 2000);
+      // Also check every 60s
+      setInterval(checkSharedNotifications, 60000);
+    }
   } else {
     showLogin();
   }
