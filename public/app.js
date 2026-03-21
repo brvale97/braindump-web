@@ -1095,7 +1095,9 @@
   inboxRefreshBtn.addEventListener("click", loadInbox);
 
   // --- Sync & Sort ---
-  const SYNC_URL = "https://wsl-amd.tail66afad.ts.net/sync";
+  const SYNC_URL = window.location.hostname === "localhost"
+    ? "http://localhost:8765/sync"
+    : "https://wsl-amd.tail66afad.ts.net/sync";
   const syncBtn = document.getElementById("sync-sort-btn");
   const syncLabel = document.getElementById("sync-sort-label");
 
@@ -1117,9 +1119,31 @@
         if (data.status === "ok") {
           syncBtn.classList.remove("syncing");
           syncBtn.classList.add("success");
-          syncLabel.textContent = "Gesorteerd!";
-          loadInbox();
-          loadOverview();
+          syncLabel.textContent = "Sorteren...";
+          // Poll inbox every 10s until empty or max 5 min
+          let polls = 0;
+          const maxPolls = 30;
+          const pollInterval = setInterval(async () => {
+            polls++;
+            syncLabel.textContent = `Sorteren... (${polls * 10}s)`;
+            await loadInbox();
+            const feed = document.getElementById("inbox-feed");
+            const items = feed ? feed.querySelectorAll(".inbox-item") : [];
+            if (items.length === 0 || polls >= maxPolls) {
+              clearInterval(pollInterval);
+              syncBtn.classList.remove("success");
+              if (items.length === 0) {
+                syncLabel.textContent = "Gesorteerd!";
+              } else {
+                syncLabel.textContent = "Klaar (check inbox)";
+              }
+              await loadOverview();
+              setTimeout(() => {
+                syncBtn.disabled = false;
+                syncLabel.textContent = "Sorteer";
+              }, 3000);
+            }
+          }, 10000);
         } else {
           throw new Error(data.message || "Sync mislukt");
         }
@@ -1132,13 +1156,12 @@
           syncLabel.textContent = "Fout";
         }
         console.error("Sync error:", err);
+        setTimeout(() => {
+          syncBtn.disabled = false;
+          syncBtn.classList.remove("success", "error");
+          syncLabel.textContent = "Sorteer";
+        }, 4000);
       }
-
-      setTimeout(() => {
-        syncBtn.disabled = false;
-        syncBtn.classList.remove("success", "error");
-        syncLabel.textContent = "Sorteer";
-      }, 4000);
     });
   }
 
