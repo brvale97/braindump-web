@@ -23,8 +23,8 @@ async function githubRequest(env, path, options = {}) {
 async function getFile(env, noCache = false) {
   const cacheBust = noCache ? `&_t=${Date.now()}` : "";
   const opts = noCache ? {
-    headers: { "If-None-Match": "" },
-    cf: { cacheTtl: 0 }
+    headers: { "If-None-Match": "", "Cache-Control": "no-cache" },
+    cf: { cacheTtl: 0, cacheEverything: false }
   } : {};
   const res = await githubRequest(env, `contents/${FILE_PATH}?ref=${BRANCH}${cacheBust}`, opts);
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
