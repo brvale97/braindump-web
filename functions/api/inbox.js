@@ -5,20 +5,28 @@ const BRANCH = "main";
 
 async function githubRequest(env, path, options = {}) {
   const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/${path}`;
-  const res = await fetch(url, {
-    ...options,
+  const { headers: extraHeaders, cf, ...restOptions } = options;
+  const fetchOpts = {
+    ...restOptions,
     headers: {
       Authorization: `token ${env.GITHUB_TOKEN}`,
       Accept: "application/vnd.github.v3+json",
       "User-Agent": "braindump-web",
-      ...options.headers,
+      ...extraHeaders,
     },
-  });
+  };
+  if (cf) fetchOpts.cf = cf;
+  const res = await fetch(url, fetchOpts);
   return res;
 }
 
-async function getFile(env) {
-  const res = await githubRequest(env, `contents/${FILE_PATH}?ref=${BRANCH}`);
+async function getFile(env, noCache = false) {
+  const cacheBust = noCache ? `&_t=${Date.now()}` : "";
+  const opts = noCache ? {
+    headers: { "If-None-Match": "" },
+    cf: { cacheTtl: 0 }
+  } : {};
+  const res = await githubRequest(env, `contents/${FILE_PATH}?ref=${BRANCH}${cacheBust}`, opts);
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
   const data = await res.json();
   const content = atob(data.content.replace(/\n/g, ""));
@@ -56,9 +64,13 @@ export async function onRequestGet(context) {
   const denied = guardBram(context);
   if (denied) return denied;
   try {
-    const { content } = await getFile(context.env);
+    const url = new URL(context.request.url);
+    const noCache = url.searchParams.has("nocache");
+    const { content } = await getFile(context.env, noCache);
     const items = parseInbox(content);
-    return Response.json({ items });
+    return Response.json({ items }, noCache ? {
+      headers: { "Cache-Control": "no-store, no-cache", "Pragma": "no-cache" }
+    } : {});
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });
   }

@@ -157,14 +157,17 @@
 
   // --- Inbox ---
 
-  async function loadInbox() {
+  async function loadInbox(noCache = false) {
     inboxLoading.classList.remove("hidden");
     try {
-      const data = await api("/api/inbox");
+      const url = noCache ? `/api/inbox?nocache=1&_t=${Date.now()}` : "/api/inbox";
+      const data = await api(url);
       inboxLoading.classList.add("hidden");
       renderInbox(data.items || []);
+      return (data.items || []).length;
     } catch {
       inboxLoading.textContent = "Laden mislukt";
+      return -1;
     }
   }
 
@@ -1121,14 +1124,16 @@
           const maxPolls = 30;
           const pollInterval = setInterval(async () => {
             polls++;
-            syncLabel.textContent = `Sorteren... (${polls * 10}s)`;
-            await loadInbox();
-            const feed = document.getElementById("inbox-feed");
-            const items = feed ? feed.querySelectorAll(".inbox-item") : [];
-            if (items.length === 0 || polls >= maxPolls) {
+            const itemCount = await loadInbox(true);
+            if (itemCount > 0) {
+              syncLabel.textContent = `Sorteren... (${itemCount} item${itemCount === 1 ? "" : "s"} over)`;
+            } else {
+              syncLabel.textContent = `Sorteren... (${polls * 10}s)`;
+            }
+            if (itemCount === 0 || polls >= maxPolls) {
               clearInterval(pollInterval);
               syncBtn.classList.remove("success");
-              if (items.length === 0) {
+              if (itemCount === 0) {
                 syncLabel.textContent = "Gesorteerd!";
               } else {
                 syncLabel.textContent = "Klaar (check inbox)";
