@@ -79,7 +79,7 @@
 
     const res = await fetch(path, { ...options, headers });
 
-    if (res.status === 401) {
+    if (res.status === 401 && path !== "/api/auth") {
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(EXPIRY_KEY);
       localStorage.removeItem(ROLE_KEY);
