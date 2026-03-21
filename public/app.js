@@ -1097,7 +1097,7 @@
   // --- Sync & Sort ---
   const SYNC_URL = window.location.hostname === "localhost"
     ? "http://localhost:8765/sync"
-    : "https://wsl-amd.tail66afad.ts.net/sync";
+    : "https://sporting-tones-societies-nor.trycloudflare.com/sync";
   const syncBtn = document.getElementById("sync-sort-btn");
   const syncLabel = document.getElementById("sync-sort-label");
 
