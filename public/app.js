@@ -1097,10 +1097,31 @@
   refreshBtn.addEventListener("click", loadOverview);
   inboxRefreshBtn.addEventListener("click", loadInbox);
 
+  // --- Toast Notification ---
+  function showToast(message, duration = 5000) {
+    let container = document.getElementById("toast-container");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "toast-container";
+      document.body.appendChild(container);
+    }
+    const toast = document.createElement("div");
+    toast.className = "toast";
+    toast.textContent = message;
+    container.appendChild(toast);
+    // Trigger animation
+    requestAnimationFrame(() => toast.classList.add("show"));
+    setTimeout(() => {
+      toast.classList.remove("show");
+      toast.addEventListener("transitionend", () => toast.remove());
+    }, duration);
+  }
+
   // --- Sync & Sort ---
   const SYNC_URL = "/api/sync";
   const syncBtn = document.getElementById("sync-sort-btn");
   const syncLabel = document.getElementById("sync-sort-label");
+  let sortPollTimer = null;
 
   if (syncBtn) {
     syncBtn.addEventListener("click", async () => {
@@ -1108,104 +1129,44 @@
       syncBtn.disabled = true;
       syncBtn.classList.remove("success", "error");
       syncBtn.classList.add("syncing");
-      syncLabel.textContent = "Bezig...";
+      syncLabel.textContent = "Wordt gesorteerd (\u00b12 min)...";
 
-      try {
-        const data = await api(SYNC_URL, {
-          method: "POST",
-          signal: AbortSignal.timeout(320000), // 5+ min for Claude
-        });
-        if (data.status === "ok") {
-          syncBtn.classList.remove("syncing");
-          syncBtn.classList.add("success");
-          // Get initial item count before polling starts
-          const initialCount = await loadInbox(true);
-          if (initialCount === 0) {
-            // Already empty, nothing to sort
-            syncBtn.classList.remove("success");
-            syncLabel.textContent = "Inbox was al leeg";
-            await loadOverview();
-            setTimeout(() => {
-              syncBtn.disabled = false;
-              syncLabel.textContent = "Sorteer";
-            }, 3000);
-          } else {
-            syncLabel.textContent = initialCount > 0
-              ? `Sorteren... (${initialCount} item${initialCount === 1 ? "" : "s"})`
-              : "Sorteren...";
-            // Poll inbox every 10s until empty or max 5 min
-            let polls = 0;
-            const maxPolls = 30;
-            let lastKnownCount = initialCount > 0 ? initialCount : null;
-            let consecutiveErrors = 0;
-            const pollInterval = setInterval(async () => {
-              polls++;
-              const itemCount = await loadInbox(true);
-              // Also check DOM for empty state as fallback
-              const domEmpty = !!inboxFeed.querySelector(".empty");
+      // Fire-and-forget: send the POST but don't wait for completion
+      api(SYNC_URL, {
+        method: "POST",
+        signal: AbortSignal.timeout(320000),
+      }).catch((err) => {
+        console.error("Sync POST error (background):", err);
+      });
 
-              if (itemCount === -1) {
-                // Load error — show time but keep polling
-                consecutiveErrors++;
-                syncLabel.textContent = `Sorteren... (${polls * 10}s)`;
-                // After 5 consecutive errors, give up
-                if (consecutiveErrors >= 5) {
-                  clearInterval(pollInterval);
-                  syncBtn.classList.remove("success");
-                  syncLabel.textContent = "Fout bij laden";
-                  await loadOverview();
-                  setTimeout(() => {
-                    syncBtn.disabled = false;
-                    syncBtn.classList.remove("success", "error");
-                    syncLabel.textContent = "Sorteer";
-                  }, 4000);
-                }
-                return;
-              }
+      // After 2 seconds, reset the button so the user can continue
+      setTimeout(() => {
+        syncBtn.disabled = false;
+        syncBtn.classList.remove("syncing", "success", "error");
+        syncLabel.textContent = "Sorteer";
+      }, 2000);
 
-              consecutiveErrors = 0;
+      // Start background polling every 15s to check if inbox is empty
+      if (sortPollTimer) clearInterval(sortPollTimer);
+      let polls = 0;
+      const maxPolls = 20; // 20 * 15s = 5 min
+      sortPollTimer = setInterval(async () => {
+        polls++;
+        const itemCount = await loadInbox(true);
+        const domEmpty = !!inboxFeed.querySelector(".empty");
 
-              if (itemCount > 0) {
-                lastKnownCount = itemCount;
-                syncLabel.textContent = `Sorteren... (${itemCount} item${itemCount === 1 ? "" : "s"} over)`;
-              } else {
-                syncLabel.textContent = `Sorteren... (${polls * 10}s)`;
-              }
-
-              if (itemCount === 0 || domEmpty || polls >= maxPolls) {
-                clearInterval(pollInterval);
-                syncBtn.classList.remove("success");
-                if (itemCount === 0 || domEmpty) {
-                  syncLabel.textContent = "Gesorteerd!";
-                } else {
-                  syncLabel.textContent = "Klaar (check inbox)";
-                }
-                await loadOverview();
-                setTimeout(() => {
-                  syncBtn.disabled = false;
-                  syncLabel.textContent = "Sorteer";
-                }, 3000);
-              }
-            }, 10000);
-          }
-        } else {
-          throw new Error(data.message || "Sync mislukt");
+        if (itemCount === 0 || domEmpty) {
+          clearInterval(sortPollTimer);
+          sortPollTimer = null;
+          showToast("\u2713 Inbox gesorteerd!");
+          await loadInbox(true);
+          await loadOverview();
+        } else if (polls >= maxPolls) {
+          // 5 min timeout — stop silently
+          clearInterval(sortPollTimer);
+          sortPollTimer = null;
         }
-      } catch (err) {
-        syncBtn.classList.remove("syncing");
-        syncBtn.classList.add("error");
-        if (err.name === "TimeoutError" || err.message.includes("fetch")) {
-          syncLabel.textContent = "Niet beschikbaar";
-        } else {
-          syncLabel.textContent = "Fout";
-        }
-        console.error("Sync error:", err);
-        setTimeout(() => {
-          syncBtn.disabled = false;
-          syncBtn.classList.remove("success", "error");
-          syncLabel.textContent = "Sorteer";
-        }, 4000);
-      }
+      }, 15000);
     });
   }
 
