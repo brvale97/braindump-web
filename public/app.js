@@ -115,6 +115,13 @@
 
   // --- Screens ---
 
+  function logout() {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(EXPIRY_KEY);
+    localStorage.removeItem(ROLE_KEY);
+    showLogin();
+  }
+
   function showLogin() {
     loginScreen.classList.remove("hidden");
     appScreen.classList.add("hidden");
@@ -1402,6 +1409,9 @@
     const hasKey = !!localStorage.getItem(GROQ_KEY);
     micBtn.classList.toggle("hidden", !hasKey);
   }
+
+  const logoutBtn = document.getElementById("logout-btn");
+  logoutBtn.addEventListener("click", () => logout());
 
   settingsBtn.addEventListener("click", () => {
     const key = localStorage.getItem(GROQ_KEY) || "";
