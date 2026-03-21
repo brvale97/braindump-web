@@ -80,6 +80,7 @@ function parseStructured(content) {
   if (!content) return [];
   const lines = content.split("\n");
   const result = [];
+  let lastTopLevelSkipped = false; // track if last top-level item was done/skipped
 
   const skipHeaders = new Set([
     "werk", "fysieke taken", "persoonlijk",
@@ -97,21 +98,29 @@ function parseStructured(content) {
       const level = (trimmed.match(/^#+/) || [""])[0].length;
       if (skipHeaders.has(text.toLowerCase())) continue;
       result.push({ type: "header", text, level });
+      lastTopLevelSkipped = false;
     } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
       const text = trimmed.slice(2);
       // Skip done items
-      if (text.includes("~~") || text.startsWith("[x]") || text.startsWith("[X]")) continue;
+      if (text.includes("~~") || text.startsWith("[x]") || text.startsWith("[X]")) {
+        if (indent < 2) lastTopLevelSkipped = true;
+        continue;
+      }
 
       // Indented = sub-item / context of the last item
       if (indent >= 2) {
+        // Skip sub-items whose parent was a done/skipped item
+        if (lastTopLevelSkipped) continue;
         const lastItem = [...result].reverse().find((r) => r.type === "item");
         if (lastItem) {
           const ctxText = text.startsWith("[ ]") ? text.slice(4).trim() : text;
           lastItem.contexts.push(ctxText);
         }
       } else if (text.startsWith("[ ]")) {
+        lastTopLevelSkipped = false;
         result.push({ type: "item", text: text.slice(4).trim(), contexts: [] });
       } else {
+        lastTopLevelSkipped = false;
         result.push({ type: "item", text, contexts: [] });
       }
     }
