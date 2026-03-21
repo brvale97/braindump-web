@@ -5,3 +5,7 @@ pages_build_output_dir = "./public"
 [vars]
 REPO_OWNER = "brvale97"
 REPO_NAME = "braindump-bram"
+
+[[kv_namespaces]]
+binding = "SYNC_STORE"
+id = "d53d3ab2512640648f86c48e571da370"

@@ -1095,9 +1095,7 @@
   inboxRefreshBtn.addEventListener("click", loadInbox);
 
   // --- Sync & Sort ---
-  const SYNC_URL = window.location.hostname === "localhost"
-    ? "http://localhost:8765/sync"
-    : "https://sporting-tones-societies-nor.trycloudflare.com/sync";
+  const SYNC_URL = "/api/sync";
   const syncBtn = document.getElementById("sync-sort-btn");
   const syncLabel = document.getElementById("sync-sort-label");
 
@@ -1110,12 +1108,10 @@
       syncLabel.textContent = "Bezig...";
 
       try {
-        const res = await fetch(SYNC_URL, {
+        const data = await api(SYNC_URL, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           signal: AbortSignal.timeout(320000), // 5+ min for Claude
         });
-        const data = await res.json();
         if (data.status === "ok") {
           syncBtn.classList.remove("syncing");
           syncBtn.classList.add("success");
