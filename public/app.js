@@ -1094,6 +1094,54 @@
   refreshBtn.addEventListener("click", loadOverview);
   inboxRefreshBtn.addEventListener("click", loadInbox);
 
+  // --- Sync & Sort ---
+  const SYNC_URL = "https://wsl-amd.tail66afad.ts.net/sync";
+  const syncBtn = document.getElementById("sync-sort-btn");
+  const syncLabel = document.getElementById("sync-sort-label");
+
+  if (syncBtn) {
+    syncBtn.addEventListener("click", async () => {
+      if (syncBtn.disabled) return;
+      syncBtn.disabled = true;
+      syncBtn.classList.remove("success", "error");
+      syncBtn.classList.add("syncing");
+      syncLabel.textContent = "Bezig...";
+
+      try {
+        const res = await fetch(SYNC_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(320000), // 5+ min for Claude
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          syncBtn.classList.remove("syncing");
+          syncBtn.classList.add("success");
+          syncLabel.textContent = "Gesorteerd!";
+          loadInbox();
+          loadOverview();
+        } else {
+          throw new Error(data.message || "Sync mislukt");
+        }
+      } catch (err) {
+        syncBtn.classList.remove("syncing");
+        syncBtn.classList.add("error");
+        if (err.name === "TimeoutError" || err.message.includes("fetch")) {
+          syncLabel.textContent = "Niet beschikbaar";
+        } else {
+          syncLabel.textContent = "Fout";
+        }
+        console.error("Sync error:", err);
+      }
+
+      setTimeout(() => {
+        syncBtn.disabled = false;
+        syncBtn.classList.remove("success", "error");
+        syncLabel.textContent = "Sorteer";
+      }, 4000);
+    });
+  }
+
   // --- Drag & Drop Reorder ---
 
   let dragState = null;

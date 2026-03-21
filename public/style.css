@@ -154,11 +154,60 @@ body {
 
 .tab-content.hidden { display: none !important; }
 
+/* Sync & Sort button */
+.sync-sort-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 0.3rem 0.7rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 500;
+  font-family: inherit;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+  white-space: nowrap;
+}
+
+.sync-sort-btn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--text-muted);
+  background: var(--surface2);
+}
+
+.sync-sort-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sync-sort-btn.syncing svg {
+  animation: spin 1s linear infinite;
+}
+
+.sync-sort-btn.success {
+  color: #2d8a4e;
+  border-color: #2d8a4e;
+}
+
+.sync-sort-btn.error {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Inbox */
 .inbox-header {
   display: flex;
   justify-content: flex-end;
   padding: 0.5rem 1rem 0;
+  gap: 0.5rem;
 }
 
 .inbox-feed {
