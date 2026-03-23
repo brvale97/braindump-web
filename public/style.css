@@ -179,8 +179,13 @@ body {
 }
 
 .sync-sort-btn:disabled {
-  opacity: 0.5;
   cursor: not-allowed;
+}
+
+.sync-sort-btn.syncing {
+  color: #2d8a4e;
+  border-color: #2d8a4e;
+  background: #e8f5e9;
 }
 
 .sync-sort-btn.syncing svg {
@@ -188,13 +193,15 @@ body {
 }
 
 .sync-sort-btn.success {
-  color: #2d8a4e;
+  color: white;
   border-color: #2d8a4e;
+  background: #2d8a4e;
 }
 
 .sync-sort-btn.error {
-  color: var(--danger);
+  color: white;
   border-color: var(--danger);
+  background: var(--danger);
 }
 
 @keyframes spin {
@@ -355,6 +362,104 @@ body {
   color: var(--accent);
 }
 
+/* Edit button */
+.edit-btn {
+  opacity: 0;
+  transition: opacity 0.2s, color 0.2s;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inbox-item:hover .edit-btn {
+  opacity: 1;
+}
+
+.edit-btn:hover {
+  color: var(--accent);
+}
+
+/* Inline edit UI */
+.edit-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.edit-textarea {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  font-family: inherit;
+  border: 1.5px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  resize: vertical;
+  outline: none;
+}
+
+.edit-textarea:focus {
+  border-color: var(--accent-hover);
+  box-shadow: 0 0 0 2px rgba(218, 123, 59, 0.15);
+}
+
+.edit-btn-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.edit-save-btn {
+  padding: 0.35rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-family: inherit;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.edit-save-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.edit-save-btn:disabled {
+  opacity: 0.5;
+}
+
+.edit-cancel-btn {
+  padding: 0.35rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  font-family: inherit;
+  background: none;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.edit-cancel-btn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.inbox-item.editing {
+  border-color: var(--accent);
+}
+
 /* Context sub-items */
 .inbox-contexts {
   display: flex;
@@ -428,7 +533,8 @@ body {
 @media (hover: none) {
   .inbox-item .copy-btn,
   .inbox-item .delete-btn,
-  .inbox-item .context-btn {
+  .inbox-item .context-btn,
+  .inbox-item .edit-btn {
     opacity: 0.4;
   }
 }

@@ -207,6 +207,41 @@ export async function onRequestPatch(context) {
   }
 }
 
+// PUT: edit an existing inbox item's text
+export async function onRequestPut(context) {
+  const denied = guardBram(context);
+  if (denied) return denied;
+  try {
+    const { oldItem, newText } = await context.request.json();
+    if (!oldItem || !newText || !newText.trim()) {
+      return Response.json({ error: "oldItem en newText zijn vereist" }, { status: 400 });
+    }
+
+    const { content, sha } = await getFile(context.env);
+    const lines = content.split("\n");
+    const target = `- ${oldItem.trim()}`;
+
+    const idx = lines.findIndex((line) => line.trim() === target);
+    if (idx === -1) {
+      return Response.json({ error: "Item niet gevonden" }, { status: 404 });
+    }
+
+    // Preserve timestamp if present in old item
+    const tsMatch = oldItem.match(/\*\((.+?)\)\*$/);
+    const newLine = tsMatch
+      ? `- ${newText.trim()} *(${tsMatch[1]})*`
+      : `- ${newText.trim()}`;
+
+    lines[idx] = newLine;
+    const newContent = lines.join("\n");
+    await updateFile(context.env, newContent, sha, `web: edit "${newText.trim().slice(0, 50)}"`);
+
+    return Response.json({ success: true, item: newLine });
+  } catch (e) {
+    return Response.json({ error: e.message }, { status: 500 });
+  }
+}
+
 function parseInbox(content) {
   const lines = content.split("\n");
   const items = [];

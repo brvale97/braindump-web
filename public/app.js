@@ -211,6 +211,8 @@
 
   const contextSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
 
+  const editSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+
   function makeDeleteBtn(fullText, itemEl) {
     const btn = document.createElement("button");
     btn.className = "delete-btn";
@@ -334,6 +336,106 @@
     return btn;
   }
 
+  function makeEditBtn(fullText, itemEl) {
+    const btn = document.createElement("button");
+    btn.className = "edit-btn";
+    btn.innerHTML = editSvg;
+    btn.title = "Bewerken";
+    btn.addEventListener("click", () => {
+      const contentEl = itemEl.querySelector(".inbox-item-content");
+      // If already editing, cancel
+      if (itemEl.classList.contains("editing")) {
+        itemEl.classList.remove("editing");
+        // Re-render content
+        loadInbox(true);
+        return;
+      }
+
+      // Extract the main text (without timestamp)
+      const tsMatch = fullText.match(/\*\((.+?)\)\*$/);
+      const mainText = tsMatch ? fullText.replace(/\s*\*\(.+?\)\*$/, "") : fullText;
+
+      itemEl.classList.add("editing");
+
+      // Replace content with textarea
+      const existingContexts = contentEl.querySelector(".inbox-contexts");
+      const contextsHtml = existingContexts ? existingContexts.outerHTML : "";
+
+      const editWrap = document.createElement("div");
+      editWrap.className = "edit-wrap";
+      const textarea = document.createElement("textarea");
+      textarea.className = "edit-textarea";
+      textarea.value = mainText;
+      textarea.rows = Math.max(2, Math.ceil(mainText.length / 40));
+
+      const btnRow = document.createElement("div");
+      btnRow.className = "edit-btn-row";
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "edit-save-btn";
+      saveBtn.textContent = "Opslaan";
+      const cancelBtn = document.createElement("button");
+      cancelBtn.className = "edit-cancel-btn";
+      cancelBtn.textContent = "Annuleren";
+
+      async function saveEdit() {
+        const newText = textarea.value.trim();
+        if (!newText || newText === mainText) {
+          itemEl.classList.remove("editing");
+          loadInbox(true);
+          return;
+        }
+        saveBtn.disabled = true;
+        cancelBtn.disabled = true;
+        textarea.disabled = true;
+        try {
+          const data = await api("/api/inbox", {
+            method: "PUT",
+            body: JSON.stringify({ oldItem: fullText, newText: newText }),
+          });
+          if (data.error) {
+            alert("Fout: " + data.error);
+            saveBtn.disabled = false;
+            cancelBtn.disabled = false;
+            textarea.disabled = false;
+            return;
+          }
+          itemEl.classList.remove("editing");
+          showToast("Item bijgewerkt");
+          await loadInbox(true);
+        } catch (e) {
+          alert("Kon item niet bijwerken");
+          saveBtn.disabled = false;
+          cancelBtn.disabled = false;
+          textarea.disabled = false;
+        }
+      }
+
+      textarea.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveEdit(); }
+        if (e.key === "Escape") { itemEl.classList.remove("editing"); loadInbox(true); }
+      });
+      saveBtn.addEventListener("click", saveEdit);
+      cancelBtn.addEventListener("click", () => { itemEl.classList.remove("editing"); loadInbox(true); });
+
+      btnRow.appendChild(saveBtn);
+      btnRow.appendChild(cancelBtn);
+      editWrap.appendChild(textarea);
+      editWrap.appendChild(btnRow);
+
+      // Clear content and insert edit UI
+      contentEl.innerHTML = "";
+      contentEl.appendChild(editWrap);
+      if (contextsHtml) {
+        const temp = document.createElement("div");
+        temp.innerHTML = contextsHtml;
+        contentEl.appendChild(temp.firstChild);
+      }
+      textarea.focus();
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    });
+    return btn;
+  }
+
   function appendInboxItem(itemObj) {
     const emptyEl = inboxFeed.querySelector(".empty");
     if (emptyEl) emptyEl.remove();
@@ -385,6 +487,7 @@
 
     const actions = document.createElement("div");
     actions.className = "inbox-item-actions";
+    actions.appendChild(makeEditBtn(text, div));
     actions.appendChild(makeContextBtn(text, div));
     actions.appendChild(makeCopyBtn(mainText));
     actions.appendChild(makeDeleteBtn(text, div));
@@ -1136,7 +1239,7 @@
       syncBtn.disabled = true;
       syncBtn.classList.remove("success", "error");
       syncBtn.classList.add("syncing");
-      syncLabel.textContent = "Wordt gesorteerd (\u00b12 min)...";
+      syncLabel.textContent = "Bezig met sorteren...";
 
       // Fire-and-forget: send the POST but don't wait for completion
       api(SYNC_URL, {
@@ -1145,13 +1248,6 @@
       }).catch((err) => {
         console.error("Sync POST error (background):", err);
       });
-
-      // After 2 seconds, reset the button so the user can continue
-      setTimeout(() => {
-        syncBtn.disabled = false;
-        syncBtn.classList.remove("syncing", "success", "error");
-        syncLabel.textContent = "Sorteer";
-      }, 2000);
 
       // Start background polling every 15s to check if inbox is empty
       if (sortPollTimer) clearInterval(sortPollTimer);
@@ -1165,13 +1261,30 @@
         if (itemCount === 0 || domEmpty) {
           clearInterval(sortPollTimer);
           sortPollTimer = null;
+          // Show success state
+          syncBtn.classList.remove("syncing");
+          syncBtn.classList.add("success");
+          syncLabel.textContent = "Gesorteerd!";
           showToast("\u2713 Inbox gesorteerd!");
-          await loadInbox(true);
           await loadOverview();
+          // Reset button after 4 seconds
+          setTimeout(() => {
+            syncBtn.disabled = false;
+            syncBtn.classList.remove("success");
+            syncLabel.textContent = "Sorteer";
+          }, 4000);
         } else if (polls >= maxPolls) {
-          // 5 min timeout — stop silently
+          // 5 min timeout — show error state
           clearInterval(sortPollTimer);
           sortPollTimer = null;
+          syncBtn.classList.remove("syncing");
+          syncBtn.classList.add("error");
+          syncLabel.textContent = "Timeout";
+          setTimeout(() => {
+            syncBtn.disabled = false;
+            syncBtn.classList.remove("error");
+            syncLabel.textContent = "Sorteer";
+          }, 4000);
         }
       }, 15000);
     });
