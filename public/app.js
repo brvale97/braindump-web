@@ -401,7 +401,15 @@
           }
           itemEl.classList.remove("editing");
           showToast("Item bijgewerkt");
-          await loadInbox(true);
+          // Optimistic UI update from response
+          const updatedText = data.item ? data.item.replace(/^- /, "") : newText;
+          const contentEl = itemEl.querySelector(".inbox-item-content");
+          const tsM = updatedText.match(/\*\((.+?)\)\*$/);
+          const displayText = tsM ? updatedText.replace(/\s*\*\(.+?\)\*$/, "") : updatedText;
+          const tsHtml = tsM ? `<span class="inbox-ts">${tsM[1]}</span>` : "";
+          contentEl.innerHTML = `<span class="inbox-text">${displayText}</span>${tsHtml}`;
+          // Background sync after GitHub settles
+          setTimeout(() => loadInbox(true), 2000);
         } catch (e) {
           alert("Kon item niet bijwerken");
           saveBtn.disabled = false;
