@@ -336,7 +336,7 @@
     return btn;
   }
 
-  function makeEditBtn(fullText, itemEl) {
+  function makeInboxEditBtn(fullText, itemEl) {
     const btn = document.createElement("button");
     btn.className = "edit-btn";
     btn.innerHTML = editSvg;
@@ -487,7 +487,7 @@
 
     const actions = document.createElement("div");
     actions.className = "inbox-item-actions";
-    actions.appendChild(makeEditBtn(text, div));
+    actions.appendChild(makeInboxEditBtn(text, div));
     actions.appendChild(makeContextBtn(text, div));
     actions.appendChild(makeCopyBtn(mainText));
     actions.appendChild(makeDeleteBtn(text, div));
