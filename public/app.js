@@ -460,7 +460,7 @@
 
     // Check for markdown image link: [filename.ext](url)
     const imgExts = /\.(jpe?g|png|gif|webp|svg)$/i;
-    const linkMatch = mainText.match(/^\[(.+?)\]\((.+?)\)$/);
+    const linkMatch = mainText.match(/^\[(.+?)\]\((.+?)\)(.*)/);
 
     const content = document.createElement("div");
     content.className = "inbox-item-content";
@@ -468,6 +468,10 @@
     if (linkMatch && imgExts.test(linkMatch[1])) {
       const rawUrl = linkMatch[2].replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/");
       content.innerHTML = `<img class="inbox-img" src="${escapeHtml(rawUrl)}" alt="${escapeHtml(linkMatch[1])}">`;
+      const caption = linkMatch[3].trim();
+      if (caption) {
+        content.innerHTML += `<span class="item-caption">${escapeHtml(caption)}</span>`;
+      }
       if (tsMatch) {
         content.innerHTML += `<span class="timestamp">${escapeHtml(tsMatch[1])}</span>`;
       }
@@ -521,6 +525,17 @@
     img.src = imgSrc;
     img.alt = altText;
     content.appendChild(img);
+
+    // Check for caption text after the image link
+    if (entryText) {
+      const captionMatch = entryText.match(/^\[.+?\]\(.+?\)\s*(.*?)(\s*\*\(.+?\)\*)?$/);
+      if (captionMatch && captionMatch[1] && captionMatch[1].trim()) {
+        const capSpan = document.createElement("span");
+        capSpan.className = "item-caption";
+        capSpan.textContent = captionMatch[1].trim();
+        content.appendChild(capSpan);
+      }
+    }
 
     const tsMatch = entryText && entryText.match(/\*\((.+?)\)\*$/);
     if (tsMatch) {
@@ -586,7 +601,16 @@
   }
 
   function renderMarkdown(text) {
-    return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    const imgExts = /\.(jpe?g|png|gif|webp|svg)$/i;
+    return escapeHtml(text)
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\[(.+?)\]\((.+?)\)/g, (match, label, url) => {
+        if (imgExts.test(label)) {
+          const rawUrl = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/");
+          return `<img class="inbox-img" src="${rawUrl}" alt="${label}">`;
+        }
+        return `<a href="${url}" target="_blank" rel="noopener">${label}</a>`;
+      });
   }
 
   async function loadOverview() {
@@ -1065,15 +1089,17 @@
     });
   }
 
-  async function uploadFile(file) {
+  async function uploadFile(file, caption) {
     const base64 = await readFileAsBase64(file);
+    const payload = {
+      filename: file.name,
+      mimeType: file.type,
+      content: base64,
+    };
+    if (caption) payload.caption = caption;
     const data = await api("/api/upload", {
       method: "POST",
-      body: JSON.stringify({
-        filename: file.name,
-        mimeType: file.type,
-        content: base64,
-      }),
+      body: JSON.stringify(payload),
     });
     if (data.error) throw new Error(data.error);
     return data;
@@ -1091,9 +1117,13 @@
     micBtn.disabled = true;
 
     try {
-      for (const file of files) {
+      const captionForLastFile = (text && files.length > 0) ? text : null;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const isLast = i === files.length - 1;
+        const caption = isLast ? captionForLastFile : null;
         const localUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
-        const result = await uploadFile(file);
+        const result = await uploadFile(file, caption);
         if (localUrl) {
           appendInboxImage(localUrl, file.name, result.entry);
         } else {
@@ -1101,7 +1131,7 @@
         }
       }
       if (files.length > 0) clearUploadPreview();
-      if (text) {
+      if (text && !captionForLastFile) {
         const data = await api("/api/inbox", {
           method: "POST",
           body: JSON.stringify({ item: text }),
@@ -1111,6 +1141,8 @@
           return;
         }
         appendInboxItem({ text: data.item.replace(/^- /, ""), contexts: [] });
+      }
+      if (text) {
         inboxInput.value = "";
         autoResize(inboxInput);
       }

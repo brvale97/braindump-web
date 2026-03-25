@@ -43,7 +43,7 @@ async function updateFile(env, filePath, content, sha, message) {
 
 export async function onRequestPost(context) {
   try {
-    const { filename, mimeType, content } = await context.request.json();
+    const { filename, mimeType, content, caption } = await context.request.json();
 
     if (!filename || !content) {
       return Response.json({ error: "Bestandsnaam en inhoud zijn vereist" }, { status: 400 });
@@ -83,7 +83,9 @@ export async function onRequestPost(context) {
       hour: "2-digit",
       minute: "2-digit",
     });
-    const entry = `- [${filename}](${fileUrl}) *(${timestamp})*`;
+    const entry = caption
+      ? `- [${filename}](${fileUrl}) ${caption} *(${timestamp})*`
+      : `- [${filename}](${fileUrl}) *(${timestamp})*`;
 
     const { content: inboxContent, sha } = await getFile(context.env, "inbox.md");
     const lines = inboxContent.split("\n");
