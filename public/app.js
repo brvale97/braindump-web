@@ -30,6 +30,16 @@
   const sharedSend = document.getElementById("shared-send");
   const sharedRefreshBtn = document.getElementById("shared-refresh-btn");
 
+  // Lightbox
+  const lightbox = document.getElementById("lightbox");
+  const lightboxImg = document.getElementById("lightbox-img");
+  function openLightbox(src) {
+    lightboxImg.src = src;
+    lightbox.classList.add("open");
+  }
+  lightbox.addEventListener("click", () => lightbox.classList.remove("open"));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") lightbox.classList.remove("open"); });
+
   // Convert GitHub URLs to proxy URLs for private repo images
   function toProxyUrl(githubUrl) {
     const match = githubUrl.match(/github\.com\/brvale97\/braindump-bram\/blob\/main\/(.+)/);
@@ -477,6 +487,7 @@
     if (linkMatch && (imgExts.test(linkMatch[1]) || imgExts.test(linkMatch[2]))) {
       const proxyUrl = toProxyUrl(linkMatch[2]);
       content.innerHTML = `<img class="inbox-img" src="${escapeHtml(proxyUrl)}" alt="${escapeHtml(linkMatch[1])}">`;
+      content.querySelector(".inbox-img").addEventListener("click", () => openLightbox(proxyUrl));
       const caption = linkMatch[3].trim();
       if (caption) {
         content.innerHTML += `<span class="item-caption">${escapeHtml(caption)}</span>`;
@@ -533,6 +544,7 @@
     img.className = "inbox-img";
     img.src = imgSrc;
     img.alt = altText;
+    img.addEventListener("click", () => openLightbox(img.src));
     content.appendChild(img);
 
     // Check for caption text after the image link
@@ -616,7 +628,7 @@
       .replace(/\[(.+?)\]\((.+?)\)/g, (match, label, url) => {
         if (imgExts.test(label) || imgExts.test(url)) {
           const proxyUrl = toProxyUrl(url);
-          return `<img class="inbox-img" src="${proxyUrl}" alt="${label}">`;
+          return `<img class="inbox-img" data-lightbox="true" src="${proxyUrl}" alt="${label}">`;
         }
         return `<a href="${url}" target="_blank" rel="noopener">${label}</a>`;
       });
@@ -711,6 +723,7 @@
           // Update the displayed text
           const mainEl = row.querySelector(".item-main");
           mainEl.innerHTML = renderMarkdown(newText);
+          mainEl.querySelectorAll('.inbox-img[data-lightbox]').forEach(img => img.addEventListener("click", () => openLightbox(img.src)));
           // Update button references to new text
           row.querySelectorAll(".copy-btn").forEach(b => {
             b.onclick = () => {
@@ -897,6 +910,7 @@
         if (parsed.date) {
           mainEl.innerHTML += ` <span class="item-date">&middot; ${escapeHtml(formatDate(parsed.date))}</span>`;
         }
+        mainEl.querySelectorAll('.inbox-img[data-lightbox]').forEach(img => img.addEventListener("click", () => openLightbox(img.src)));
         textWrap.appendChild(mainEl);
 
         // Context sub-items
