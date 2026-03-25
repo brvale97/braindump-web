@@ -268,7 +268,7 @@ body {
   border: 1px solid var(--border);
 }
 
-.inbox-item .inbox-img {
+.inbox-img {
   width: 160px;
   height: 120px;
   border-radius: 8px;
@@ -277,7 +277,7 @@ body {
   cursor: pointer;
   transition: opacity 0.15s;
 }
-.inbox-item .inbox-img:hover {
+.inbox-img:hover {
   opacity: 0.85;
 }
 
