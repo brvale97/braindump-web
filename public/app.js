@@ -30,6 +30,15 @@
   const sharedSend = document.getElementById("shared-send");
   const sharedRefreshBtn = document.getElementById("shared-refresh-btn");
 
+  // Convert GitHub URLs to proxy URLs for private repo images
+  function toProxyUrl(githubUrl) {
+    const match = githubUrl.match(/github\.com\/brvale97\/braindump-bram\/blob\/main\/(.+)/);
+    if (match) return `/api/image?path=${encodeURIComponent(match[1])}`;
+    const rawMatch = githubUrl.match(/raw\.githubusercontent\.com\/brvale97\/braindump-bram\/main\/(.+)/);
+    if (rawMatch) return `/api/image?path=${encodeURIComponent(rawMatch[1])}`;
+    return githubUrl;
+  }
+
   let overviewData = {};
   let activeCategory = "alles";
   let pendingFiles = [];
@@ -466,8 +475,8 @@
     content.className = "inbox-item-content";
 
     if (linkMatch && (imgExts.test(linkMatch[1]) || imgExts.test(linkMatch[2]))) {
-      const rawUrl = linkMatch[2].replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/");
-      content.innerHTML = `<img class="inbox-img" src="${escapeHtml(rawUrl)}" alt="${escapeHtml(linkMatch[1])}">`;
+      const proxyUrl = toProxyUrl(linkMatch[2]);
+      content.innerHTML = `<img class="inbox-img" src="${escapeHtml(proxyUrl)}" alt="${escapeHtml(linkMatch[1])}">`;
       const caption = linkMatch[3].trim();
       if (caption) {
         content.innerHTML += `<span class="item-caption">${escapeHtml(caption)}</span>`;
@@ -606,8 +615,8 @@
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
       .replace(/\[(.+?)\]\((.+?)\)/g, (match, label, url) => {
         if (imgExts.test(label) || imgExts.test(url)) {
-          const rawUrl = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/");
-          return `<img class="inbox-img" src="${rawUrl}" alt="${label}">`;
+          const proxyUrl = toProxyUrl(url);
+          return `<img class="inbox-img" src="${proxyUrl}" alt="${label}">`;
         }
         return `<a href="${url}" target="_blank" rel="noopener">${label}</a>`;
       });
