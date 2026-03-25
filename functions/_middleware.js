@@ -3,8 +3,8 @@ export async function onRequest(context) {
   const { request, env, next } = context;
   const url = new URL(request.url);
 
-  // Skip auth check for the auth endpoint itself and for static files
-  if (url.pathname === "/api/auth" || !url.pathname.startsWith("/api/")) {
+  // Skip auth check for the auth endpoint, image proxy, and static files
+  if (url.pathname === "/api/auth" || url.pathname === "/api/image" || !url.pathname.startsWith("/api/")) {
     return next();
   }
 
