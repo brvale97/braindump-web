@@ -465,7 +465,7 @@
     const content = document.createElement("div");
     content.className = "inbox-item-content";
 
-    if (linkMatch && imgExts.test(linkMatch[1])) {
+    if (linkMatch && (imgExts.test(linkMatch[1]) || imgExts.test(linkMatch[2]))) {
       const rawUrl = linkMatch[2].replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/");
       content.innerHTML = `<img class="inbox-img" src="${escapeHtml(rawUrl)}" alt="${escapeHtml(linkMatch[1])}">`;
       const caption = linkMatch[3].trim();
@@ -605,7 +605,7 @@
     return escapeHtml(text)
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
       .replace(/\[(.+?)\]\((.+?)\)/g, (match, label, url) => {
-        if (imgExts.test(label)) {
+        if (imgExts.test(label) || imgExts.test(url)) {
           const rawUrl = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/");
           return `<img class="inbox-img" src="${rawUrl}" alt="${label}">`;
         }
