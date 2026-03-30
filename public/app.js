@@ -1243,6 +1243,28 @@
     fileInput.value = "";
   });
 
+  inboxInput.addEventListener("paste", (e) => {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    const imageFiles = [];
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) {
+          const ext = file.type.split("/")[1] || "png";
+          const named = new File([file], `pasted-image-${Date.now()}.${ext}`, {
+            type: file.type,
+          });
+          imageFiles.push(named);
+        }
+      }
+    }
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      addFilesToPreview(imageFiles);
+    }
+  });
+
   inboxSend.addEventListener("click", handleSend);
 
   inboxInput.addEventListener("keydown", (e) => {
@@ -1287,69 +1309,6 @@
       toast.classList.remove("show");
       toast.addEventListener("transitionend", () => toast.remove());
     }, duration);
-  }
-
-  // --- Sync & Sort ---
-  const SYNC_URL = "/api/sync";
-  const syncBtn = document.getElementById("sync-sort-btn");
-  const syncLabel = document.getElementById("sync-sort-label");
-  let sortPollTimer = null;
-
-  if (syncBtn) {
-    syncBtn.addEventListener("click", async () => {
-      if (syncBtn.disabled) return;
-      syncBtn.disabled = true;
-      syncBtn.classList.remove("success", "error");
-      syncBtn.classList.add("syncing");
-      syncLabel.textContent = "Bezig met sorteren...";
-
-      // Fire-and-forget: send the POST but don't wait for completion
-      api(SYNC_URL, {
-        method: "POST",
-        signal: AbortSignal.timeout(320000),
-      }).catch((err) => {
-        console.error("Sync POST error (background):", err);
-      });
-
-      // Start background polling every 15s to check if inbox is empty
-      if (sortPollTimer) clearInterval(sortPollTimer);
-      let polls = 0;
-      const maxPolls = 20; // 20 * 15s = 5 min
-      sortPollTimer = setInterval(async () => {
-        polls++;
-        const itemCount = await loadInbox(true);
-        const domEmpty = !!inboxFeed.querySelector(".empty");
-
-        if (itemCount === 0 || domEmpty) {
-          clearInterval(sortPollTimer);
-          sortPollTimer = null;
-          // Show success state
-          syncBtn.classList.remove("syncing");
-          syncBtn.classList.add("success");
-          syncLabel.textContent = "Gesorteerd!";
-          showToast("\u2713 Inbox gesorteerd!");
-          await loadOverview();
-          // Reset button after 4 seconds
-          setTimeout(() => {
-            syncBtn.disabled = false;
-            syncBtn.classList.remove("success");
-            syncLabel.textContent = "Sorteer";
-          }, 4000);
-        } else if (polls >= maxPolls) {
-          // 5 min timeout — show error state
-          clearInterval(sortPollTimer);
-          sortPollTimer = null;
-          syncBtn.classList.remove("syncing");
-          syncBtn.classList.add("error");
-          syncLabel.textContent = "Timeout";
-          setTimeout(() => {
-            syncBtn.disabled = false;
-            syncBtn.classList.remove("error");
-            syncLabel.textContent = "Sorteer";
-          }, 4000);
-        }
-      }, 15000);
-    });
   }
 
   // --- Drag & Drop Reorder ---
