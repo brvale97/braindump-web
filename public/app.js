@@ -1243,25 +1243,80 @@
     fileInput.value = "";
   });
 
-  inboxInput.addEventListener("paste", (e) => {
+  inboxInput.addEventListener("paste", async (e) => {
+    // Try standard clipboardData.items first (works on desktop)
     const items = e.clipboardData && e.clipboardData.items;
-    if (!items) return;
-    const imageFiles = [];
-    for (const item of items) {
-      if (item.type.startsWith("image/")) {
-        const file = item.getAsFile();
-        if (file) {
-          const ext = file.type.split("/")[1] || "png";
-          const named = new File([file], `pasted-image-${Date.now()}.${ext}`, {
-            type: file.type,
-          });
-          imageFiles.push(named);
+    if (items) {
+      const imageFiles = [];
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) {
+            const ext = file.type.split("/")[1] || "png";
+            const named = new File([file], `pasted-image-${Date.now()}.${ext}`, {
+              type: file.type,
+            });
+            imageFiles.push(named);
+          }
         }
       }
+      if (imageFiles.length > 0) {
+        e.preventDefault();
+        addFilesToPreview(imageFiles);
+        return;
+      }
     }
-    if (imageFiles.length > 0) {
-      e.preventDefault();
-      addFilesToPreview(imageFiles);
+    // Fallback: async Clipboard API (needed for Gboard / Android)
+    if (navigator.clipboard && navigator.clipboard.read) {
+      try {
+        const clipItems = await navigator.clipboard.read();
+        const imageFiles = [];
+        for (const clipItem of clipItems) {
+          for (const type of clipItem.types) {
+            if (type.startsWith("image/")) {
+              const blob = await clipItem.getType(type);
+              const ext = type.split("/")[1] || "png";
+              const file = new File([blob], `pasted-image-${Date.now()}.${ext}`, {
+                type,
+              });
+              imageFiles.push(file);
+            }
+          }
+        }
+        if (imageFiles.length > 0) {
+          e.preventDefault();
+          addFilesToPreview(imageFiles);
+        }
+      } catch (err) {
+        // Permission denied or no image in clipboard — ignore
+      }
+    }
+  });
+
+  // Gboard/Android: some keyboards insert pasted content via input event
+  inboxInput.addEventListener("input", async (e) => {
+    if (e.inputType !== "insertFromPaste") return;
+    if (!navigator.clipboard || !navigator.clipboard.read) return;
+    try {
+      const clipItems = await navigator.clipboard.read();
+      const imageFiles = [];
+      for (const clipItem of clipItems) {
+        for (const type of clipItem.types) {
+          if (type.startsWith("image/")) {
+            const blob = await clipItem.getType(type);
+            const ext = type.split("/")[1] || "png";
+            const file = new File([blob], `pasted-image-${Date.now()}.${ext}`, {
+              type,
+            });
+            imageFiles.push(file);
+          }
+        }
+      }
+      if (imageFiles.length > 0) {
+        addFilesToPreview(imageFiles);
+      }
+    } catch (err) {
+      // Permission denied or no image — ignore
     }
   });
 
