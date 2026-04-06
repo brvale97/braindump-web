@@ -1320,6 +1320,42 @@
     }
   });
 
+  // Clipboard paste button (for mobile Chrome where textarea paste doesn't work for images)
+  const pasteBtn = document.getElementById("paste-btn");
+  if (navigator.clipboard && navigator.clipboard.read) {
+    // Show on touch devices or always — it's harmless on desktop too
+    if ("ontouchstart" in window || navigator.maxTouchPoints > 0) {
+      pasteBtn.style.display = "";
+    }
+  }
+  pasteBtn.addEventListener("click", async () => {
+    if (!navigator.clipboard || !navigator.clipboard.read) {
+      alert("Klembord niet beschikbaar");
+      return;
+    }
+    try {
+      const clipItems = await navigator.clipboard.read();
+      const imageFiles = [];
+      for (const clipItem of clipItems) {
+        for (const type of clipItem.types) {
+          if (type.startsWith("image/")) {
+            const blob = await clipItem.getType(type);
+            const ext = type.split("/")[1] || "png";
+            const file = new File([blob], `pasted-image-${Date.now()}.${ext}`, { type });
+            imageFiles.push(file);
+          }
+        }
+      }
+      if (imageFiles.length > 0) {
+        addFilesToPreview(imageFiles);
+      } else {
+        alert("Geen afbeelding op klembord gevonden");
+      }
+    } catch (err) {
+      alert("Kan klembord niet lezen — geef toestemming als gevraagd");
+    }
+  });
+
   inboxSend.addEventListener("click", handleSend);
 
   inboxInput.addEventListener("keydown", (e) => {
