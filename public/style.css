@@ -154,56 +154,6 @@ body {
 
 .tab-content.hidden { display: none !important; }
 
-/* Sync & Sort button */
-.sync-sort-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  padding: 0.3rem 0.7rem;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.78rem;
-  font-weight: 500;
-  font-family: inherit;
-  transition: color 0.2s, border-color 0.2s, background 0.2s;
-  white-space: nowrap;
-}
-
-.sync-sort-btn:hover:not(:disabled) {
-  color: var(--text);
-  border-color: var(--text-muted);
-  background: var(--surface2);
-}
-
-.sync-sort-btn:disabled {
-  cursor: not-allowed;
-}
-
-.sync-sort-btn.syncing {
-  color: #2d8a4e;
-  border-color: #2d8a4e;
-  background: #e8f5e9;
-}
-
-.sync-sort-btn.syncing svg {
-  animation: spin 1s linear infinite;
-}
-
-.sync-sort-btn.success {
-  color: white;
-  border-color: #2d8a4e;
-  background: #2d8a4e;
-}
-
-.sync-sort-btn.error {
-  color: white;
-  border-color: var(--danger);
-  background: var(--danger);
-}
-
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
