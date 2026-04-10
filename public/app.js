@@ -1243,118 +1243,134 @@
     fileInput.value = "";
   });
 
-  inboxInput.addEventListener("paste", async (e) => {
-    // Try standard clipboardData.items first (works on desktop)
-    const items = e.clipboardData && e.clipboardData.items;
-    if (items) {
-      const imageFiles = [];
-      for (const item of items) {
-        if (item.type.startsWith("image/")) {
+  // --- Paste image handling ---
+  // Helper: extract image files from a ClipboardEvent synchronously.
+  // Checks both clipboardData.items and clipboardData.files because
+  // different browsers populate different fields (e.g. "Copy Image"
+  // from Chrome fills `files`, Snipping Tool fills `items`).
+  function extractImagesFromClipboardEvent(e) {
+    const out = [];
+    const cd = e.clipboardData || window.clipboardData;
+    if (!cd) return out;
+    const seen = new Set();
+    if (cd.items && cd.items.length) {
+      for (const item of cd.items) {
+        if (item.kind === "file" && item.type && item.type.startsWith("image/")) {
           const file = item.getAsFile();
-          if (file) {
-            const ext = file.type.split("/")[1] || "png";
-            const named = new File([file], `pasted-image-${Date.now()}.${ext}`, {
-              type: file.type,
-            });
-            imageFiles.push(named);
+          if (file && !seen.has(file)) {
+            seen.add(file);
+            const ext = (file.type.split("/")[1] || "png").split("+")[0];
+            out.push(new File([file], `pasted-image-${Date.now()}-${out.length}.${ext}`, {
+              type: file.type || "image/png",
+            }));
           }
         }
       }
-      if (imageFiles.length > 0) {
-        e.preventDefault();
-        addFilesToPreview(imageFiles);
-        return;
-      }
     }
-    // Fallback: async Clipboard API (needed for Gboard / Android)
-    if (navigator.clipboard && navigator.clipboard.read) {
-      try {
-        const clipItems = await navigator.clipboard.read();
-        const imageFiles = [];
-        for (const clipItem of clipItems) {
-          for (const type of clipItem.types) {
-            if (type.startsWith("image/")) {
-              const blob = await clipItem.getType(type);
-              const ext = type.split("/")[1] || "png";
-              const file = new File([blob], `pasted-image-${Date.now()}.${ext}`, {
-                type,
-              });
-              imageFiles.push(file);
-            }
-          }
-        }
-        if (imageFiles.length > 0) {
-          e.preventDefault();
-          addFilesToPreview(imageFiles);
-        }
-      } catch (err) {
-        // Permission denied or no image in clipboard — ignore
-      }
-    }
-  });
-
-  // Gboard/Android: some keyboards insert pasted content via input event
-  inboxInput.addEventListener("input", async (e) => {
-    if (e.inputType !== "insertFromPaste") return;
-    if (!navigator.clipboard || !navigator.clipboard.read) return;
-    try {
-      const clipItems = await navigator.clipboard.read();
-      const imageFiles = [];
-      for (const clipItem of clipItems) {
-        for (const type of clipItem.types) {
-          if (type.startsWith("image/")) {
-            const blob = await clipItem.getType(type);
-            const ext = type.split("/")[1] || "png";
-            const file = new File([blob], `pasted-image-${Date.now()}.${ext}`, {
-              type,
-            });
-            imageFiles.push(file);
-          }
+    if (cd.files && cd.files.length) {
+      for (const file of cd.files) {
+        if (file && file.type && file.type.startsWith("image/") && !seen.has(file)) {
+          seen.add(file);
+          const ext = (file.type.split("/")[1] || "png").split("+")[0];
+          out.push(new File([file], `pasted-image-${Date.now()}-${out.length}.${ext}`, {
+            type: file.type || "image/png",
+          }));
         }
       }
-      if (imageFiles.length > 0) {
-        addFilesToPreview(imageFiles);
-      }
-    } catch (err) {
-      // Permission denied or no image — ignore
     }
-  });
-
-  // Clipboard paste button (for mobile Chrome where textarea paste doesn't work for images)
-  const pasteBtn = document.getElementById("paste-btn");
-  if (navigator.clipboard && navigator.clipboard.read) {
-    // Show on touch devices or always — it's harmless on desktop too
-    if ("ontouchstart" in window || navigator.maxTouchPoints > 0) {
-      pasteBtn.style.display = "";
-    }
+    return out;
   }
-  pasteBtn.addEventListener("click", async () => {
-    if (!navigator.clipboard || !navigator.clipboard.read) {
-      alert("Klembord niet beschikbaar");
+
+  // Helper: read images from the async Clipboard API (navigator.clipboard.read).
+  // Used as fallback when the paste event has no image data, and as the
+  // primary path for the manual "paste" button (required on Android/iOS
+  // where textarea paste events never carry image data).
+  async function readImagesFromClipboardApi() {
+    if (!navigator.clipboard || !navigator.clipboard.read) return [];
+    const clipItems = await navigator.clipboard.read();
+    const out = [];
+    for (const clipItem of clipItems) {
+      for (const type of clipItem.types) {
+        if (type.startsWith("image/")) {
+          const blob = await clipItem.getType(type);
+          const ext = (type.split("/")[1] || "png").split("+")[0];
+          out.push(new File([blob], `pasted-image-${Date.now()}-${out.length}.${ext}`, { type }));
+        }
+      }
+    }
+    return out;
+  }
+
+  // Desktop + most browsers: listen for "paste" on the textarea AND on
+  // document as a safety net (some mobile browsers fire paste on body/document
+  // when the user long-presses to paste outside the text selection area).
+  async function handlePasteEvent(e) {
+    // Only react when the inbox tab is actually visible on screen.
+    // Skip when the login screen is showing, or when the user is on a
+    // different tab (shared / overview).
+    const appScr = document.getElementById("app-screen");
+    const inboxTab = document.getElementById("tab-inbox");
+    if (!appScr || appScr.classList.contains("hidden")) return;
+    if (!inboxTab || inboxTab.classList.contains("hidden")) return;
+    // Avoid double-handling when the event bubbles from textarea to document.
+    if (e.defaultPrevented) return;
+
+    const sync = extractImagesFromClipboardEvent(e);
+    if (sync.length > 0) {
+      e.preventDefault();
+      addFilesToPreview(sync);
+      showToast(`${sync.length} afbeelding${sync.length > 1 ? "en" : ""} geplakt`);
       return;
     }
+    // Fallback to async Clipboard API (Gboard / some Android flows).
     try {
-      const clipItems = await navigator.clipboard.read();
-      const imageFiles = [];
-      for (const clipItem of clipItems) {
-        for (const type of clipItem.types) {
-          if (type.startsWith("image/")) {
-            const blob = await clipItem.getType(type);
-            const ext = type.split("/")[1] || "png";
-            const file = new File([blob], `pasted-image-${Date.now()}.${ext}`, { type });
-            imageFiles.push(file);
-          }
-        }
-      }
-      if (imageFiles.length > 0) {
-        addFilesToPreview(imageFiles);
-      } else {
-        alert("Geen afbeelding op klembord gevonden");
+      const asyncImgs = await readImagesFromClipboardApi();
+      if (asyncImgs.length > 0) {
+        e.preventDefault();
+        addFilesToPreview(asyncImgs);
+        showToast(`${asyncImgs.length} afbeelding${asyncImgs.length > 1 ? "en" : ""} geplakt`);
       }
     } catch (err) {
-      alert("Kan klembord niet lezen — geef toestemming als gevraagd");
+      // Permission denied / no image — silent, user can still use the paste button.
     }
-  });
+  }
+
+  inboxInput.addEventListener("paste", handlePasteEvent);
+  // Safety net: catch paste events that bubble up when focus is elsewhere
+  // in the inbox tab (e.g. on body, preview area, or after long-press paste).
+  document.addEventListener("paste", handlePasteEvent);
+
+  // Clipboard paste button — always visible when the async Clipboard API is
+  // available. On mobile Chrome/Android this is the ONLY reliable way to
+  // paste a screenshot into a textarea (paste events never carry image data
+  // from the system clipboard on Android). On desktop it's a useful fallback
+  // too if the browser's paste event filter drops images.
+  const pasteBtn = document.getElementById("paste-btn");
+  if (pasteBtn) {
+    if (navigator.clipboard && navigator.clipboard.read) {
+      pasteBtn.style.display = "";
+    }
+    pasteBtn.addEventListener("click", async () => {
+      if (!navigator.clipboard || !navigator.clipboard.read) {
+        showToast("Klembord niet beschikbaar in deze browser");
+        return;
+      }
+      try {
+        const imgs = await readImagesFromClipboardApi();
+        if (imgs.length > 0) {
+          addFilesToPreview(imgs);
+          showToast(`${imgs.length} afbeelding${imgs.length > 1 ? "en" : ""} geplakt`);
+        } else {
+          showToast("Geen afbeelding op klembord gevonden");
+        }
+      } catch (err) {
+        const msg = err && err.name === "NotAllowedError"
+          ? "Klembord-toegang geweigerd — sta toe in browser-instellingen"
+          : "Kan klembord niet lezen: " + (err && err.message ? err.message : "onbekende fout");
+        showToast(msg, 7000);
+      }
+    });
+  }
 
   inboxSend.addEventListener("click", handleSend);
 
