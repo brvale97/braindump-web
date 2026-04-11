@@ -893,9 +893,20 @@
         card.appendChild(header);
       } else {
         const parsed = parseItemText(entry.text);
+        // Detect 🤖 prefix → item is flagged as "Claude Code can pick this up".
+        // Works across any category (useful for hybrid items in werk/fysiek/etc).
+        // NOTE: parsed.text must stay as the raw value so backend API calls
+        // (done/edit/move) still match the line in the .md file. We only strip
+        // the emoji from displayText, which is what the UI renders.
+        const isClaudeItem = /^🤖\s*/.test(parsed.text);
+        const displayText = isClaudeItem
+          ? parsed.text.replace(/^🤖\s*/, "")
+          : parsed.text;
         const contexts = entry.contexts || [];
         const row = document.createElement("div");
-        row.className = "overview-item" + (lastHeaderLevel >= 3 ? " sub-item" : "");
+        row.className = "overview-item"
+          + (lastHeaderLevel >= 3 ? " sub-item" : "")
+          + (isClaudeItem ? " claude-item" : "");
 
         const circle = document.createElement("div");
         circle.className = "circle";
@@ -906,7 +917,14 @@
         textWrap.className = "item-text";
         const mainEl = document.createElement("span");
         mainEl.className = "item-main";
-        mainEl.innerHTML = renderMarkdown(parsed.text);
+        mainEl.innerHTML = renderMarkdown(displayText);
+        if (isClaudeItem) {
+          const badge = document.createElement("span");
+          badge.className = "claude-badge";
+          badge.textContent = "🤖";
+          badge.title = "Claude Code kan dit oppakken";
+          mainEl.prepend(badge);
+        }
         if (parsed.date) {
           mainEl.innerHTML += ` <span class="item-date">&middot; ${escapeHtml(formatDate(parsed.date))}</span>`;
         }
@@ -1011,25 +1029,52 @@
   }
 
   function renderAllCategories() {
-    const order = ["werk", "fysiek", "code", "persoonlijk", "someday"];
+    // Two zones: "claude" (things Claude Code can pick up) vs "jij" (things Bram does himself)
+    const zones = [
+      {
+        key: "claude",
+        title: "🤖 Claude Code kan oppakken",
+        cats: ["code"],
+      },
+      {
+        key: "jij",
+        title: "👤 Jij zelf",
+        cats: ["werk", "fysiek", "persoonlijk", "someday"],
+      },
+    ];
     let hasItems = false;
 
-    order.forEach((cat) => {
-      const items = overviewData[cat] || [];
-      const hasRealItems = items.some((e) => e.type !== "header");
-      if (items.length === 0 || !hasRealItems) return;
-      hasItems = true;
+    zones.forEach((zone) => {
+      // Check if this zone has any items across its categories (including 🤖-override items)
+      const zoneHasItems = zone.cats.some((cat) => {
+        const items = overviewData[cat] || [];
+        return items.some((e) => e.type !== "header");
+      });
+      if (!zoneHasItems) return;
 
-      const card = document.createElement("div");
-      card.className = "overview-card";
+      // Zone header
+      const zoneHeader = document.createElement("div");
+      zoneHeader.className = `zone-header zone-${zone.key}`;
+      zoneHeader.textContent = zone.title;
+      overviewContent.appendChild(zoneHeader);
 
-      const title = document.createElement("div");
-      title.className = "overview-card-title";
-      title.textContent = categoryLabels[cat] || cat;
-      card.appendChild(title);
+      zone.cats.forEach((cat) => {
+        const items = overviewData[cat] || [];
+        const hasRealItems = items.some((e) => e.type !== "header");
+        if (items.length === 0 || !hasRealItems) return;
+        hasItems = true;
 
-      renderItemsIntoCard(card, sortItemsByDate(items), cat);
-      overviewContent.appendChild(card);
+        const card = document.createElement("div");
+        card.className = `overview-card zone-card zone-card-${zone.key}`;
+
+        const title = document.createElement("div");
+        title.className = "overview-card-title";
+        title.textContent = categoryLabels[cat] || cat;
+        card.appendChild(title);
+
+        renderItemsIntoCard(card, sortItemsByDate(items), cat);
+        overviewContent.appendChild(card);
+      });
     });
 
     if (!hasItems) {

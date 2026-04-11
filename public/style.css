@@ -737,6 +737,43 @@ body {
   padding: 0.5rem 0;
 }
 
+/* --- Zones op de "Alles"-tab: Claude Code vs Jij zelf --- */
+.zone-header {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.25rem 0.25rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.zone-header.zone-claude {
+  color: #3b82f6;
+}
+.zone-header.zone-jij {
+  color: #d97706;
+}
+.zone-card-claude {
+  border-left: 3px solid #3b82f6;
+}
+.zone-card-jij {
+  border-left: 3px solid #f59e0b;
+}
+
+/* Per-item override via 🤖 prefix — subtiele blauwe accent ongeacht categorie */
+.overview-item.claude-item {
+  background: rgba(59, 130, 246, 0.05);
+  border-left: 2px solid #3b82f6;
+}
+.claude-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.78rem;
+  margin-right: 0.3rem;
+  filter: saturate(1.2);
+}
+
 .overview-card-title {
   font-size: 0.8rem;
   font-weight: 700;
