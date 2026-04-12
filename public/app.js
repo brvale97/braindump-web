@@ -1004,7 +1004,7 @@
     categoryTabs.forEach((t) => t.classList.toggle("active", t.dataset.cat === cat));
 
     // Clear and render
-    overviewContent.querySelectorAll(".overview-card, .empty").forEach((el) => el.remove());
+    overviewContent.querySelectorAll(".overview-card, .empty, .zone-header").forEach((el) => el.remove());
 
     if (cat === "alles") {
       renderAllCategories();
