@@ -30,6 +30,13 @@
   const sharedSend = document.getElementById("shared-send");
   const sharedRefreshBtn = document.getElementById("shared-refresh-btn");
 
+  // GeP tab elements
+  const gepFeed = document.getElementById("gep-feed");
+  const gepLoading = document.getElementById("gep-loading");
+  const gepInput = document.getElementById("gep-input");
+  const gepSend = document.getElementById("gep-send");
+  const gepRefreshBtn = document.getElementById("gep-refresh-btn");
+
   // Lightbox
   const lightbox = document.getElementById("lightbox");
   const lightboxImg = document.getElementById("lightbox-img");
@@ -55,6 +62,7 @@
   let sortNewest = false;
   let sharedPollTimer = null;
   let sharedLoaded = false;
+  let gepLoaded = false;
 
   const categoryLabels = {
     werk: "GEP",
@@ -158,12 +166,14 @@
     const role = getRole();
     const inboxTab = document.querySelector('.tab[data-tab="inbox"]');
     const overviewTab = document.querySelector('.tab[data-tab="overview"]');
+    const gepTab = document.querySelector('.tab[data-tab="gep"]');
     const sharedTab = document.querySelector('.tab[data-tab="shared"]');
 
     if (role === "anna") {
       // Anna only sees the shared tab
       inboxTab.classList.add("hidden");
       overviewTab.classList.add("hidden");
+      gepTab.classList.add("hidden");
       sharedTab.classList.remove("hidden");
 
       // Activate shared tab
@@ -176,6 +186,7 @@
       // Bram sees all tabs
       inboxTab.classList.remove("hidden");
       overviewTab.classList.remove("hidden");
+      gepTab.classList.remove("hidden");
       sharedTab.classList.remove("hidden");
       loadInbox();
     }
@@ -1244,6 +1255,10 @@
         loadOverview();
       }
 
+      if (tab.dataset.tab === "gep") {
+        if (!gepLoaded) loadGep();
+      }
+
       if (tab.dataset.tab === "shared") {
         if (!sharedLoaded) loadShared();
         // Record visit time for notification dot (Bram only)
@@ -2125,6 +2140,273 @@
   sharedInput.addEventListener("input", () => autoResize(sharedInput));
 
   sharedRefreshBtn.addEventListener("click", loadShared);
+
+  // --- GeP Tab ---
+
+  async function loadGep() {
+    gepLoading.classList.remove("hidden");
+    try {
+      const data = await api("/api/gep");
+      gepLoading.classList.add("hidden");
+      gepLoaded = true;
+      renderGep(data.items || []);
+    } catch {
+      gepLoading.textContent = "Laden mislukt";
+    }
+  }
+
+  function renderGep(items) {
+    gepFeed.querySelectorAll(".inbox-item").forEach((el) => el.remove());
+    const emptyEl = gepFeed.querySelector(".empty");
+    if (emptyEl) emptyEl.remove();
+
+    if (items.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "GeP inbox is leeg";
+      gepFeed.appendChild(empty);
+      return;
+    }
+
+    items.forEach((item) => {
+      if (typeof item === "string") {
+        appendGepItem({ text: item, contexts: [] });
+      } else {
+        appendGepItem(item);
+      }
+    });
+
+    gepFeed.scrollTop = gepFeed.scrollHeight;
+  }
+
+  function appendGepItem(itemObj) {
+    const emptyEl = gepFeed.querySelector(".empty");
+    if (emptyEl) emptyEl.remove();
+
+    const text = typeof itemObj === "string" ? itemObj : itemObj.text;
+    const contexts = (typeof itemObj === "object" && itemObj.contexts) || [];
+
+    const div = document.createElement("div");
+    div.className = "inbox-item";
+
+    // Extract author tag [Author]
+    const authorMatch = text.match(/^\[(\w+)\]\s*/);
+    const author = authorMatch ? authorMatch[1] : null;
+    const textWithoutAuthor = authorMatch ? text.slice(authorMatch[0].length) : text;
+
+    // Extract timestamp
+    const tsMatch = textWithoutAuthor.match(/\*\((.+?)\)\*$/);
+    const mainText = tsMatch ? textWithoutAuthor.replace(/\s*\*\(.+?\)\*$/, "") : textWithoutAuthor;
+
+    const content = document.createElement("div");
+    content.className = "inbox-item-content";
+
+    // Author badge
+    if (author) {
+      const badge = document.createElement("span");
+      badge.className = "author-badge author-" + author.toLowerCase();
+      badge.textContent = author;
+      content.appendChild(badge);
+    }
+
+    const textSpan = document.createElement("span");
+    if (tsMatch) {
+      textSpan.innerHTML = `${escapeHtml(mainText)} <span class="timestamp">${escapeHtml(tsMatch[1])}</span>`;
+    } else {
+      textSpan.textContent = mainText;
+    }
+    content.appendChild(textSpan);
+
+    // Context sub-items
+    const contextContainer = document.createElement("div");
+    contextContainer.className = "inbox-contexts";
+    contexts.forEach((ctx) => {
+      const ctxDiv = document.createElement("div");
+      ctxDiv.className = "inbox-context";
+      const ctxAuthorMatch = ctx.match(/^\[(\w+)\]\s*/);
+      const ctxAuthor = ctxAuthorMatch ? ctxAuthorMatch[1] : null;
+      const ctxTextNoAuthor = ctxAuthorMatch ? ctx.slice(ctxAuthorMatch[0].length) : ctx;
+      const ctxTsMatch = ctxTextNoAuthor.match(/\*\((.+?)\)\*$/);
+      const ctxText = ctxTsMatch ? ctxTextNoAuthor.replace(/\s*\*\(.+?\)\*$/, "") : ctxTextNoAuthor;
+
+      let inner = "";
+      if (ctxAuthor) {
+        inner += `<span class="author-badge author-${ctxAuthor.toLowerCase()}">${escapeHtml(ctxAuthor)}</span> `;
+      }
+      inner += escapeHtml(ctxText);
+      if (ctxTsMatch) {
+        inner += ` <span class="timestamp">${escapeHtml(ctxTsMatch[1])}</span>`;
+      }
+      ctxDiv.innerHTML = inner;
+      contextContainer.appendChild(ctxDiv);
+    });
+    content.appendChild(contextContainer);
+
+    const actions = document.createElement("div");
+    actions.className = "inbox-item-actions";
+    actions.appendChild(makeGepContextBtn(text, div));
+    actions.appendChild(makeCopyBtn(mainText));
+    actions.appendChild(makeGepDeleteBtn(text, div));
+
+    div.appendChild(content);
+    div.appendChild(actions);
+
+    gepFeed.appendChild(div);
+    gepFeed.scrollTop = gepFeed.scrollHeight;
+  }
+
+  function makeGepDeleteBtn(fullText, itemEl) {
+    const btn = document.createElement("button");
+    btn.className = "delete-btn";
+    btn.innerHTML = deleteSvg;
+    btn.title = "Verwijderen";
+    btn.addEventListener("click", async () => {
+      if (!confirm("Dit item verwijderen?")) return;
+      btn.disabled = true;
+      try {
+        const data = await api("/api/gep", {
+          method: "DELETE",
+          body: JSON.stringify({ item: fullText }),
+        });
+        if (data.error) {
+          alert("Fout: " + data.error);
+          return;
+        }
+        itemEl.style.animation = "none";
+        itemEl.style.transition = "opacity 0.2s, transform 0.2s";
+        itemEl.style.opacity = "0";
+        itemEl.style.transform = "translateX(20px)";
+        setTimeout(() => {
+          itemEl.remove();
+          if (!gepFeed.querySelector(".inbox-item")) {
+            const empty = document.createElement("div");
+            empty.className = "empty";
+            empty.textContent = "GeP inbox is leeg";
+            gepFeed.appendChild(empty);
+          }
+        }, 200);
+      } catch (e) {
+        alert("Kon item niet verwijderen");
+        btn.disabled = false;
+      }
+    });
+    return btn;
+  }
+
+  function makeGepContextBtn(fullText, itemEl) {
+    const btn = document.createElement("button");
+    btn.className = "context-btn";
+    btn.innerHTML = contextSvg;
+    btn.title = "Context toevoegen";
+    btn.addEventListener("click", () => {
+      let wrap = itemEl.querySelector(".context-input-wrap");
+      if (wrap) {
+        wrap.remove();
+        return;
+      }
+      wrap = document.createElement("div");
+      wrap.className = "context-input-wrap";
+      const input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = "Context toevoegen...";
+      const sendBtn = document.createElement("button");
+      sendBtn.textContent = "Toevoegen";
+      sendBtn.className = "context-send-btn";
+
+      async function submitContext() {
+        const val = input.value.trim();
+        if (!val) return;
+        input.disabled = true;
+        sendBtn.disabled = true;
+        try {
+          const data = await api("/api/gep", {
+            method: "PATCH",
+            body: JSON.stringify({ parentItem: fullText, context: val }),
+          });
+          if (data.error) {
+            alert("Fout: " + data.error);
+            return;
+          }
+          const contextContainer = itemEl.querySelector(".inbox-contexts");
+          const ctxDiv = document.createElement("div");
+          ctxDiv.className = "inbox-context";
+          const ctxAuthorMatch = data.context.match(/^\[(\w+)\]\s*/);
+          const ctxAuthor = ctxAuthorMatch ? ctxAuthorMatch[1] : null;
+          const ctxTextNoAuthor = ctxAuthorMatch ? data.context.slice(ctxAuthorMatch[0].length) : data.context;
+          const ctxTsMatch = ctxTextNoAuthor.match(/\*\((.+?)\)\*$/);
+          const ctxText = ctxTsMatch ? ctxTextNoAuthor.replace(/\s*\*\(.+?\)\*$/, "") : ctxTextNoAuthor;
+          let inner = "";
+          if (ctxAuthor) {
+            inner += `<span class="author-badge author-${ctxAuthor.toLowerCase()}">${escapeHtml(ctxAuthor)}</span> `;
+          }
+          inner += escapeHtml(ctxText);
+          if (ctxTsMatch) {
+            inner += ` <span class="timestamp">${escapeHtml(ctxTsMatch[1])}</span>`;
+          }
+          ctxDiv.innerHTML = inner;
+          contextContainer.appendChild(ctxDiv);
+          wrap.remove();
+        } catch (e) {
+          alert("Kon context niet toevoegen");
+          input.disabled = false;
+          sendBtn.disabled = false;
+        }
+      }
+
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") submitContext();
+        if (e.key === "Escape") wrap.remove();
+      });
+      sendBtn.addEventListener("click", submitContext);
+
+      wrap.appendChild(input);
+      wrap.appendChild(sendBtn);
+      itemEl.querySelector(".inbox-item-content").appendChild(wrap);
+      input.focus();
+    });
+    return btn;
+  }
+
+  async function addGepItem(text) {
+    gepSend.disabled = true;
+    gepInput.disabled = true;
+    try {
+      const data = await api("/api/gep", {
+        method: "POST",
+        body: JSON.stringify({ item: text }),
+      });
+      if (data.error) {
+        alert("Fout: " + data.error);
+        return;
+      }
+      appendGepItem({ text: data.item.replace(/^- /, ""), contexts: [] });
+      gepInput.value = "";
+      autoResize(gepInput);
+    } catch (e) {
+      alert("Kon item niet toevoegen");
+    } finally {
+      gepSend.disabled = false;
+      gepInput.disabled = false;
+      gepInput.focus();
+    }
+  }
+
+  gepSend.addEventListener("click", () => {
+    const text = gepInput.value.trim();
+    if (text) addGepItem(text);
+  });
+
+  gepInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      const text = gepInput.value.trim();
+      if (text) addGepItem(text);
+    }
+  });
+
+  gepInput.addEventListener("input", () => autoResize(gepInput));
+
+  gepRefreshBtn.addEventListener("click", loadGep);
 
   // --- Shared Tab Polling ---
 
