@@ -658,6 +658,18 @@
     }
   }
 
+  async function refreshAllTabs() {
+    const role = getRole();
+    const tasks = [];
+
+    if (role !== "anna") {
+      tasks.push(loadInbox(true), loadOverview(), loadGep());
+    }
+
+    tasks.push(loadShared());
+    await Promise.allSettled(tasks);
+  }
+
   async function markItemDone(category, itemText, row) {
     const circle = row.querySelector(".circle");
     circle.classList.add("checking");
@@ -1455,7 +1467,7 @@
     renderCategory(activeCategory);
   });
 
-  refreshBtn.addEventListener("click", loadOverview);
+  refreshBtn.addEventListener("click", refreshAllTabs);
   inboxRefreshBtn.addEventListener("click", loadInbox);
 
   // --- Toast Notification ---
