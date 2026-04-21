@@ -28,3 +28,9 @@ env.SESSION_SECRET ("(hidden)")                                           Enviro
 [wrangler:info] GET /sw.js 200 OK (9ms)
 [wrangler:info] POST /api/auth 200 OK (20ms)
 [wrangler:info] GET /api/inbox 200 OK (267ms)
+✨ Compiled Worker successfully
+⎔ Reloading local server...
+⎔ Local server updated and ready
+✨ Compiled Worker successfully
+⎔ Reloading local server...
+⎔ Local server updated and ready

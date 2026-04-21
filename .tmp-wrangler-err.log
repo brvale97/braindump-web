@@ -1,0 +1,70 @@
+A ReadableStream branch was created but never consumed. Such branches can be created, for instance, by calling the tee() method on a ReadableStream, or by calling the clone() method on a Request or Response object. If a branch is created but never consumed, it can force the runtime to buffer the entire body of the stream in memory, which may cause the Worker to exceed its memory limit and be terminated. To avoid this, ensure that all branches created are consumed.
+
+ * Unused stream created:
+    at next (file:///C:/Users/Gebruiker/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/middleware-miniflare3-json-error.ts:28:4)
+    at Object.fetch (file:///C:/Users/Gebruiker/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/common.ts:66:3)
+    at fetchDispatcher (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/dev-k2Vp9a/functionsWorker-0.6413197215565143.js:2349:19)
+    at __facade_invokeChain__ (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:108:15)
+    at Object.next (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:106:8)
+    at jsonError (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:66:6)
+    at __facade_invokeChain__ (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:108:15)
+    at Object.next (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:106:8)
+    at drainBody (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:29:17)
+    at __facade_invokeChain__ (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:108:15)
+
+A ReadableStream branch was created but never consumed. Such branches can be created, for instance, by calling the tee() method on a ReadableStream, or by calling the clone() method on a Request or Response object. If a branch is created but never consumed, it can force the runtime to buffer the entire body of the stream in memory, which may cause the Worker to exceed its memory limit and be terminated. To avoid this, ensure that all branches created are consumed.
+
+ * Unused stream created:
+    at next (file:///C:/Users/Gebruiker/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/middleware-miniflare3-json-error.ts:28:4)
+    at Object.fetch (file:///C:/Users/Gebruiker/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/common.ts:66:3)
+    at fetchDispatcher (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/dev-k2Vp9a/functionsWorker-0.6413197215565143.js:2349:19)
+    at __facade_invokeChain__ (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:108:15)
+    at Object.next (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:106:8)
+    at jsonError (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:66:6)
+    at __facade_invokeChain__ (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:108:15)
+    at Object.next (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:106:8)
+    at drainBody (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:29:17)
+    at __facade_invokeChain__ (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:108:15)
+
+A ReadableStream branch was created but never consumed. Such branches can be created, for instance, by calling the tee() method on a ReadableStream, or by calling the clone() method on a Request or Response object. If a branch is created but never consumed, it can force the runtime to buffer the entire body of the stream in memory, which may cause the Worker to exceed its memory limit and be terminated. To avoid this, ensure that all branches created are consumed.
+
+ * Unused stream created:
+    at next (file:///C:/Users/Gebruiker/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/middleware-miniflare3-json-error.ts:28:4)
+    at Object.fetch (file:///C:/Users/Gebruiker/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/common.ts:66:3)
+    at fetchDispatcher (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/dev-k2Vp9a/functionsWorker-0.6413197215565143.js:2349:19)
+    at __facade_invokeChain__ (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:108:15)
+    at Object.next (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:106:8)
+    at jsonError (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:66:6)
+    at __facade_invokeChain__ (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:108:15)
+    at Object.next (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:106:8)
+    at drainBody (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:29:17)
+    at __facade_invokeChain__ (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:108:15)
+
+A ReadableStream branch was created but never consumed. Such branches can be created, for instance, by calling the tee() method on a ReadableStream, or by calling the clone() method on a Request or Response object. If a branch is created but never consumed, it can force the runtime to buffer the entire body of the stream in memory, which may cause the Worker to exceed its memory limit and be terminated. To avoid this, ensure that all branches created are consumed.
+
+ * Unused stream created:
+    at next (file:///C:/Users/Gebruiker/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/middleware-miniflare3-json-error.ts:28:4)
+    at Object.fetch (file:///C:/Users/Gebruiker/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/common.ts:66:3)
+    at fetchDispatcher (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/dev-k2Vp9a/functionsWorker-0.6413197215565143.js:2349:19)
+    at __facade_invokeChain__ (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:108:15)
+    at Object.next (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:106:8)
+    at jsonError (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:66:6)
+    at __facade_invokeChain__ (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:108:15)
+    at Object.next (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:106:8)
+    at drainBody (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:29:17)
+    at __facade_invokeChain__ (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:108:15)
+
+A ReadableStream branch was created but never consumed. Such branches can be created, for instance, by calling the tee() method on a ReadableStream, or by calling the clone() method on a Request or Response object. If a branch is created but never consumed, it can force the runtime to buffer the entire body of the stream in memory, which may cause the Worker to exceed its memory limit and be terminated. To avoid this, ensure that all branches created are consumed.
+
+ * Unused stream created:
+    at next (file:///C:/Users/Gebruiker/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/middleware-miniflare3-json-error.ts:28:4)
+    at Object.fetch (file:///C:/Users/Gebruiker/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/common.ts:66:3)
+    at fetchDispatcher (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/dev-k2Vp9a/functionsWorker-0.6413197215565143.js:2349:19)
+    at __facade_invokeChain__ (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:108:15)
+    at Object.next (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:106:8)
+    at jsonError (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:66:6)
+    at __facade_invokeChain__ (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:108:15)
+    at Object.next (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:106:8)
+    at drainBody (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:29:17)
+    at __facade_invokeChain__ (file:///D:/projects-t3code/braindump-web/.wrangler/tmp/bundle-a49ovn/middleware-loader.entry.ts:108:15)
+

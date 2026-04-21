@@ -7,8 +7,6 @@ export async function onRequest(context) {
   if (
     url.pathname === "/api/auth" ||
     url.pathname === "/api/image" ||
-    url.pathname === "/api/telegram/webhook" ||
-    url.pathname === "/api/telegram/capture" ||
     !url.pathname.startsWith("/api/")
   ) {
     return next();

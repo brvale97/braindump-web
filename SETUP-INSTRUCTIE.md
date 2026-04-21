@@ -1801,7 +1801,6 @@ De webapp blijft de UI en de remote capture-laag.
 
 - `braindump-web` doet:
   - bestaande inbox/overview CRUD
-  - Telegram capture webhook
 - `braindump-web` is quick-dump-only in de composer
 - de echte GPT 5.4-assistent draait lokaal op je eigen pc
 - er is dus geen remote `OPENAI_API_KEY` nodig in Cloudflare
@@ -1813,51 +1812,6 @@ Zet deze als Pages secrets of production vars:
 - `GITHUB_TOKEN`
 - `PIN_HASH`
 - `SESSION_SECRET`
-- `TELEGRAM_WEBHOOK_SECRET`
-
-Optioneel als je webhook-verificatie of extra statusrouting wilt uitbreiden:
-
-- `TELEGRAM_BOT_TOKEN`
-
-### Telegram capture route
-
-Gebruik deze webhook:
-
-```text
-https://<jouw-pages-domain>/api/telegram/capture?secret=<TELEGRAM_WEBHOOK_SECRET>
-```
-
-`/api/telegram/webhook` wijst nu ook naar dezelfde capture-only flow.
-
-Gedrag:
-
-- webhook valideert alleen het secret
-- inkomende tekst wordt append-only opgeslagen in `state/telegram-backlog/YYYY-MM-DD.jsonl`
-- er wordt remote geen GPT-call gedaan
-- backlog wordt later door de lokale daemon verwerkt
-
-### Lokale daemon
-
-De lokale daemon draait standaard op:
-
-```text
-http://127.0.0.1:4317
-```
-
-De webapp gebruikt de daemon niet meer voor een assistentmodus. `Snel dumpen` loopt gewoon via de normale braindump-web API.
-
-De lokale daemon is alleen nog relevant voor lokale verwerking buiten de webcomposer, zoals Telegram/backlog-afhandeling in `bram-assistent`.
-
-### Lokale secrets
-
-Deze horen op je eigen machine in `~/.config/braindump-daemon/.env` of in lokale environment variables:
-
-- `OPENAI_API_KEY`
-- `OPENAI_MODEL_BRAINDUMP=gpt-5.4`
-- `GITHUB_TOKEN`
-- `TELEGRAM_BOT_TOKEN`
-- `OB1_BASE_URL`
-- `OB1_ACCESS_KEY`
 
 ### OB1 adapter
 
