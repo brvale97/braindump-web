@@ -4,6 +4,9 @@
   const ROLE_KEY = "braindump_role";
   const SHARED_LAST_VISITED_KEY = "braindump_shared_last_visited";
   const SHARED_LAST_ITEM_TS_KEY = "braindump_shared_last_item_ts";
+  const ACTIVE_POLL_MS = 60000;
+  const BACKGROUND_POLL_MS = 180000;
+  const OVERVIEW_CACHE_KEY = "braindump_overview_cache";
 
   // Elements
   const loginScreen = document.getElementById("login-screen");
@@ -16,6 +19,10 @@
   const inboxLoading = document.getElementById("inbox-loading");
   const inboxInput = document.getElementById("inbox-input");
   const inboxSend = document.getElementById("inbox-send");
+  const inboxMeta = document.getElementById("inbox-meta");
+  const overviewMeta = document.getElementById("overview-meta");
+  const gepMeta = document.getElementById("gep-meta");
+  const sharedMeta = document.getElementById("shared-meta");
   const categoryTabs = document.querySelectorAll(".cat-tab");
   const overviewContent = document.getElementById("overview-content");
   const overviewLoading = document.getElementById("overview-loading");
@@ -60,9 +67,16 @@
   let activeCategory = "alles";
   let pendingFiles = [];
   let sortNewest = false;
-  let sharedPollTimer = null;
   let sharedLoaded = false;
   let gepLoaded = false;
+  let activePollTimer = null;
+  let backgroundPollTimer = null;
+  let viewSnapshots = {
+    inbox: "",
+    overview: "",
+    gep: "",
+    shared: "",
+  };
 
   const categoryLabels = {
     werk: "GEP",
@@ -93,6 +107,91 @@
 
   function getRole() {
     return localStorage.getItem(ROLE_KEY) || "bram";
+  }
+
+  function currentTimeLabel() {
+    return new Intl.DateTimeFormat("nl-NL", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date()).replace(/\u200e/g, "");
+  }
+
+  function makeSnapshot(value) {
+    return JSON.stringify(value ?? null);
+  }
+
+  function markViewSnapshot(view, value) {
+    const next = makeSnapshot(value);
+    const changed = viewSnapshots[view] !== next;
+    viewSnapshots[view] = next;
+    return changed;
+  }
+
+  function getFeedScrollState(feed) {
+    const distanceFromBottom = Math.max(0, feed.scrollHeight - feed.scrollTop - feed.clientHeight);
+    return {
+      distanceFromBottom,
+      stickToBottom: distanceFromBottom < 80,
+    };
+  }
+
+  function restoreFeedScroll(feed, state) {
+    if (!state) return;
+    if (state.stickToBottom) {
+      feed.scrollTop = feed.scrollHeight;
+      return;
+    }
+    feed.scrollTop = Math.max(0, feed.scrollHeight - feed.clientHeight - state.distanceFromBottom);
+  }
+
+  function setMeta(tab, message) {
+    const label = `${currentTimeLabel()} · ${message}`;
+    if (tab === "inbox") inboxMeta.textContent = label;
+    if (tab === "overview") overviewMeta.textContent = label;
+    if (tab === "gep") gepMeta.textContent = label;
+    if (tab === "shared") sharedMeta.textContent = label;
+  }
+
+  function startGlobalPolling() {
+    stopGlobalPolling();
+    activePollTimer = setInterval(() => {
+      if (document.hidden) return;
+      refreshActiveTab(true);
+    }, ACTIVE_POLL_MS);
+    backgroundPollTimer = setInterval(() => {
+      if (document.hidden) return;
+      refreshBackgroundTabs(true);
+    }, BACKGROUND_POLL_MS);
+  }
+
+  function stopGlobalPolling() {
+    if (activePollTimer) clearInterval(activePollTimer);
+    if (backgroundPollTimer) clearInterval(backgroundPollTimer);
+    activePollTimer = null;
+    backgroundPollTimer = null;
+  }
+
+  async function refreshActiveTab(silent = false) {
+    const activeTab = document.querySelector(".tab.active");
+    const tab = activeTab?.dataset?.tab;
+    if (!tab) return;
+    if (tab === "inbox") await loadInbox(true, { silent });
+    if (tab === "overview") await loadOverview({ silent });
+    if (tab === "gep" && getRole() !== "anna") await loadGep({ silent });
+    if (tab === "shared") await loadShared({ silent });
+  }
+
+  async function refreshBackgroundTabs(silent = false) {
+    const activeTab = document.querySelector(".tab.active")?.dataset?.tab;
+    const tasks = [];
+
+    if (activeTab !== "inbox" && getRole() !== "anna") tasks.push(loadInbox(true, { silent }));
+    if (activeTab !== "overview" && Object.keys(overviewData).length > 0 && getRole() !== "anna") tasks.push(loadOverview({ silent }));
+    if (activeTab !== "gep" && gepLoaded && getRole() !== "anna") tasks.push(loadGep({ silent }));
+    if (activeTab !== "shared" && sharedLoaded) tasks.push(loadShared({ silent }));
+
+    await Promise.allSettled(tasks);
   }
 
   async function api(path, options = {}) {
@@ -146,6 +245,7 @@
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(EXPIRY_KEY);
     localStorage.removeItem(ROLE_KEY);
+    localStorage.removeItem(OVERVIEW_CACHE_KEY);
     showLogin();
   }
 
@@ -156,7 +256,9 @@
     pinInput.focus();
     overviewData = {};
     sharedLoaded = false;
-    if (sharedPollTimer) { clearInterval(sharedPollTimer); sharedPollTimer = null; }
+    gepLoaded = false;
+    viewSnapshots = { inbox: "", overview: "", gep: "", shared: "" };
+    stopGlobalPolling();
   }
 
   function showApp() {
@@ -189,19 +291,31 @@
       gepTab.classList.remove("hidden");
       sharedTab.classList.remove("hidden");
       loadInbox();
+      // Pre-fetch overview in background so it's ready when the user switches tabs
+      loadOverview({ silent: true });
     }
+
+    startGlobalPolling();
   }
 
   // --- Inbox ---
 
-  async function loadInbox(noCache = false) {
+  async function loadInbox(noCache = false, options = {}) {
+    const { silent = false } = options;
     inboxLoading.classList.remove("hidden");
     try {
       const url = noCache ? `/api/inbox?nocache=1&_t=${Date.now()}` : "/api/inbox";
       const data = await api(url);
+      const items = data.items || [];
+      const changed = markViewSnapshot("inbox", items);
       inboxLoading.classList.add("hidden");
-      renderInbox(data.items || []);
-      return (data.items || []).length;
+      if (changed) {
+        renderInbox(items);
+        if (!silent) setMeta("inbox", noCache ? "Inbox ververst" : "Inbox geladen");
+      } else if (!silent && !noCache) {
+        setMeta("inbox", "Inbox geladen");
+      }
+      return items.length;
     } catch {
       inboxLoading.textContent = "Laden mislukt";
       return -1;
@@ -209,6 +323,7 @@
   }
 
   function renderInbox(items) {
+    const scrollState = getFeedScrollState(inboxFeed);
     // Clear existing items (keep loading div)
     inboxFeed.querySelectorAll(".inbox-item").forEach((el) => el.remove());
     const emptyEl = inboxFeed.querySelector(".empty");
@@ -219,6 +334,7 @@
       empty.className = "empty";
       empty.textContent = "Inbox is leeg";
       inboxFeed.appendChild(empty);
+      restoreFeedScroll(inboxFeed, scrollState);
       return;
     }
 
@@ -231,8 +347,7 @@
       }
     });
 
-    // Scroll to bottom
-    inboxFeed.scrollTop = inboxFeed.scrollHeight;
+    restoreFeedScroll(inboxFeed, scrollState);
   }
 
   const copySvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
@@ -604,6 +719,7 @@
       }
       // Add the new item to the feed
       appendInboxItem({ text: data.item.replace(/^- /, ""), contexts: [] });
+      setMeta("inbox", "Snel gedumpt naar inbox");
       inboxInput.value = "";
       autoResize(inboxInput);
     } catch (e) {
@@ -645,16 +761,55 @@
       });
   }
 
-  async function loadOverview() {
-    overviewLoading.classList.remove("hidden");
-    overviewContent.querySelectorAll(".overview-card").forEach((el) => el.remove());
+  function getCachedOverview() {
+    try {
+      const raw = localStorage.getItem(OVERVIEW_CACHE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch { return null; }
+  }
+
+  function setCachedOverview(categories) {
+    try {
+      localStorage.setItem(OVERVIEW_CACHE_KEY, JSON.stringify(categories));
+    } catch { /* quota exceeded — ignore */ }
+  }
+
+  async function loadOverview(options = {}) {
+    const { silent = false } = options;
+
+    // Show cached data instantly so the user never waits for the spinner
+    if (Object.keys(overviewData).length === 0) {
+      const cached = getCachedOverview();
+      if (cached && Object.keys(cached).length > 0) {
+        overviewData = cached;
+        markViewSnapshot("overview", cached);
+        overviewLoading.classList.add("hidden");
+        renderCategory(activeCategory);
+        if (!silent) setMeta("overview", "Overzicht (cache)");
+      }
+    }
+
+    // Always fetch fresh data in the background
+    if (Object.keys(overviewData).length === 0) {
+      overviewLoading.classList.remove("hidden");
+    }
     try {
       const data = await api("/api/overview");
-      overviewData = data.categories || {};
+      const categories = data.categories || {};
+      const changed = markViewSnapshot("overview", categories);
+      overviewData = categories;
+      setCachedOverview(categories);
       overviewLoading.classList.add("hidden");
-      renderCategory(activeCategory);
+      if (changed) {
+        renderCategory(activeCategory);
+      }
+      if (!silent) setMeta("overview", "Overzicht ververst");
     } catch {
-      overviewLoading.textContent = "Laden mislukt";
+      // Only show failure if we have nothing cached
+      if (Object.keys(overviewData).length === 0) {
+        overviewLoading.textContent = "Laden mislukt";
+      }
     }
   }
 
@@ -1232,6 +1387,7 @@
           return;
         }
         appendInboxItem({ text: data.item.replace(/^- /, ""), contexts: [] });
+        setMeta("inbox", "Snel gedumpt naar inbox");
       }
       if (text) {
         inboxInput.value = "";
@@ -1278,9 +1434,6 @@
           localStorage.setItem(SHARED_LAST_VISITED_KEY, String(Date.now()));
           updateSharedNotificationDot();
         }
-        startSharedPolling();
-      } else {
-        stopSharedPolling();
       }
     });
   });
@@ -1412,37 +1565,6 @@
   // in the inbox tab (e.g. on body, preview area, or after long-press paste).
   document.addEventListener("paste", handlePasteEvent);
 
-  // Clipboard paste button — always visible when the async Clipboard API is
-  // available. On mobile Chrome/Android this is the ONLY reliable way to
-  // paste a screenshot into a textarea (paste events never carry image data
-  // from the system clipboard on Android). On desktop it's a useful fallback
-  // too if the browser's paste event filter drops images.
-  const pasteBtn = document.getElementById("paste-btn");
-  if (pasteBtn) {
-    if (navigator.clipboard && navigator.clipboard.read) {
-      pasteBtn.style.display = "";
-    }
-    pasteBtn.addEventListener("click", async () => {
-      if (!navigator.clipboard || !navigator.clipboard.read) {
-        showToast("Klembord niet beschikbaar in deze browser");
-        return;
-      }
-      try {
-        const imgs = await readImagesFromClipboardApi();
-        if (imgs.length > 0) {
-          addFilesToPreview(imgs);
-          showToast(`${imgs.length} afbeelding${imgs.length > 1 ? "en" : ""} geplakt`);
-        } else {
-          showToast("Geen afbeelding op klembord gevonden");
-        }
-      } catch (err) {
-        const msg = err && err.name === "NotAllowedError"
-          ? "Klembord-toegang geweigerd — sta toe in browser-instellingen"
-          : "Kan klembord niet lezen: " + (err && err.message ? err.message : "onbekende fout");
-        showToast(msg, 7000);
-      }
-    });
-  }
 
   inboxSend.addEventListener("click", handleSend);
 
@@ -1860,16 +1982,22 @@
 
   // --- Shared Tab ---
 
-  async function loadShared() {
+  async function loadShared(options = {}) {
+    const { silent = false } = options;
     sharedLoading.classList.remove("hidden");
     try {
       const data = await api("/api/shared");
+      const items = data.items || [];
+      const changed = markViewSnapshot("shared", items);
       sharedLoading.classList.add("hidden");
       sharedLoaded = true;
-      renderShared(data.items || []);
+      if (changed) {
+        renderShared(items);
+        if (!silent) setMeta("shared", "Gedeelde lijst ververst");
+      }
       // Update notification dot tracking
-      if (data.items && data.items.length > 0) {
-        const latestTs = extractLatestTimestamp(data.items);
+      if (items.length > 0) {
+        const latestTs = extractLatestTimestamp(items);
         if (latestTs) {
           localStorage.setItem(SHARED_LAST_ITEM_TS_KEY, latestTs);
         }
@@ -1899,6 +2027,7 @@
   }
 
   function renderShared(items) {
+    const scrollState = getFeedScrollState(sharedFeed);
     sharedFeed.querySelectorAll(".inbox-item").forEach((el) => el.remove());
     const emptyEl = sharedFeed.querySelector(".empty");
     if (emptyEl) emptyEl.remove();
@@ -1908,6 +2037,7 @@
       empty.className = "empty";
       empty.textContent = "Gedeelde lijst is leeg";
       sharedFeed.appendChild(empty);
+      restoreFeedScroll(sharedFeed, scrollState);
       return;
     }
 
@@ -1919,7 +2049,7 @@
       }
     });
 
-    sharedFeed.scrollTop = sharedFeed.scrollHeight;
+    restoreFeedScroll(sharedFeed, scrollState);
   }
 
   function appendSharedItem(itemObj) {
@@ -2125,6 +2255,7 @@
         return;
       }
       appendSharedItem({ text: data.item.replace(/^- /, ""), contexts: [] });
+      setMeta("shared", "Snel gedumpt naar gedeelde lijst");
       sharedInput.value = "";
       autoResize(sharedInput);
     } catch (e) {
@@ -2155,19 +2286,26 @@
 
   // --- GeP Tab ---
 
-  async function loadGep() {
+  async function loadGep(options = {}) {
+    const { silent = false } = options;
     gepLoading.classList.remove("hidden");
     try {
       const data = await api("/api/gep");
+      const items = data.items || [];
+      const changed = markViewSnapshot("gep", items);
       gepLoading.classList.add("hidden");
       gepLoaded = true;
-      renderGep(data.items || []);
+      if (changed) {
+        renderGep(items);
+        if (!silent) setMeta("gep", "GeP ververst");
+      }
     } catch {
       gepLoading.textContent = "Laden mislukt";
     }
   }
 
   function renderGep(items) {
+    const scrollState = getFeedScrollState(gepFeed);
     gepFeed.querySelectorAll(".inbox-item").forEach((el) => el.remove());
     const emptyEl = gepFeed.querySelector(".empty");
     if (emptyEl) emptyEl.remove();
@@ -2177,6 +2315,7 @@
       empty.className = "empty";
       empty.textContent = "GeP inbox is leeg";
       gepFeed.appendChild(empty);
+      restoreFeedScroll(gepFeed, scrollState);
       return;
     }
 
@@ -2188,7 +2327,7 @@
       }
     });
 
-    gepFeed.scrollTop = gepFeed.scrollHeight;
+    restoreFeedScroll(gepFeed, scrollState);
   }
 
   function appendGepItem(itemObj) {
@@ -2392,6 +2531,7 @@
         return;
       }
       appendGepItem({ text: data.item.replace(/^- /, ""), contexts: [] });
+      setMeta("gep", "Snel gedumpt naar GeP");
       gepInput.value = "";
       autoResize(gepInput);
     } catch (e) {
@@ -2419,20 +2559,6 @@
   gepInput.addEventListener("input", () => autoResize(gepInput));
 
   gepRefreshBtn.addEventListener("click", loadGep);
-
-  // --- Shared Tab Polling ---
-
-  function startSharedPolling() {
-    stopSharedPolling();
-    sharedPollTimer = setInterval(loadShared, 30000);
-  }
-
-  function stopSharedPolling() {
-    if (sharedPollTimer) {
-      clearInterval(sharedPollTimer);
-      sharedPollTimer = null;
-    }
-  }
 
   // --- Notification Dot (Bram only) ---
 
