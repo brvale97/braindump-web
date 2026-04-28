@@ -91,6 +91,7 @@ const personalController = new FeedSpaceController({
   loading: elements.personal.loading,
   input: elements.personal.input,
   meta: elements.personal.meta,
+  sendButton: elements.personal.sendButton,
   refreshButton: elements.personal.refreshButton,
   editable: true,
   externalComposer: true,

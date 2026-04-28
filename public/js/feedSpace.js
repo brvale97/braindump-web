@@ -213,8 +213,8 @@ export class FeedSpaceController {
   async submitCurrentInput() {
     const text = this.input?.value.trim();
     if (!text) return;
-    this.sendButton.disabled = true;
-    this.input.disabled = true;
+    if (this.sendButton) this.sendButton.disabled = true;
+    if (this.input) this.input.disabled = true;
     try {
       const data = await apiFetch(this.config.endpoint, {
         method: "POST",
@@ -232,9 +232,11 @@ export class FeedSpaceController {
     } catch (error) {
       showToast(error.message || "Opslaan mislukt", "error");
     } finally {
-      this.sendButton.disabled = false;
-      this.input.disabled = false;
-      this.input.focus();
+      if (this.sendButton) this.sendButton.disabled = false;
+      if (this.input) {
+        this.input.disabled = false;
+        this.input.focus();
+      }
     }
   }
 

@@ -75,3 +75,58 @@ test("anna flow only exposes shared tab", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Braindump" })).toBeHidden();
   await expect(page.getByText("Samen doen")).toBeVisible();
 });
+
+test("personal inbox can add a new item", async ({ page }) => {
+  await page.route("**/api/auth", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, role: "bram", expiry: Date.now() + 60_000 }),
+    });
+  });
+  await page.route("**/api/inbox?nocache=1", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) });
+  });
+  await page.route("**/api/inbox", async (route) => {
+    if (route.request().method() === "POST") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          item: {
+            matchKey: "new-1",
+            text: "Nieuwe inbox taak",
+            timestamp: "2026-04-28 12:15",
+            author: null,
+            contexts: [],
+            attachment: null,
+          },
+        }),
+      });
+      return;
+    }
+
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) });
+  });
+  await page.route("**/api/overview", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        categories: { werk: [], fysiek: [], code: [], persoonlijk: [], someday: [] },
+      }),
+    });
+  });
+  await page.route("**/api/shared", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) }));
+  await page.route("**/api/gep", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) }));
+
+  await page.goto("/");
+  await page.getByLabel("PIN invoeren").fill("1234");
+  await page.getByRole("button", { name: "Unlock" }).click();
+
+  await page.getByPlaceholder("Nieuw item...").fill("Nieuwe inbox taak");
+  await page.getByRole("button", { name: "Inbox item verzenden" }).click();
+
+  await expect(page.getByText("Nieuwe inbox taak")).toBeVisible();
+});
