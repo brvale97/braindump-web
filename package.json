@@ -2,11 +2,16 @@
   "name": "braindump-web",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "wrangler pages dev public",
-    "deploy": "wrangler pages deploy public"
+    "deploy": "wrangler pages deploy public",
+    "test:unit": "node --test tests/unit/*.test.js",
+    "test:e2e": "playwright test",
+    "check": "npm run test:unit && npm run test:e2e"
   },
   "devDependencies": {
+    "playwright": "^1.55.0",
     "wrangler": "^3"
   }
 }

@@ -2,7 +2,10 @@ import {
   CATEGORY_LABELS,
   SORTED_FILES,
   SPACE_FILES,
+  findFeedItem,
   normalizeInboxItemText,
+  parseFeedBlocks,
+  parseStructuredOverview,
   parseInboxItems,
   parseOpenOverviewItems,
   projectPathFromInput,
@@ -22,7 +25,7 @@ class GitHubRepoError extends Error {
   }
 }
 
-function repoConfig(env) {
+export function repoConfig(env) {
   return {
     owner: env.REPO_OWNER || REPO_OWNER,
     name: env.REPO_NAME || REPO_NAME,
@@ -30,7 +33,7 @@ function repoConfig(env) {
   };
 }
 
-function buildGitHubUrl(env, path) {
+export function buildGitHubUrl(env, path) {
   const cfg = repoConfig(env);
   return `https://api.github.com/repos/${cfg.owner}/${cfg.name}/${path}`;
 }
@@ -48,7 +51,7 @@ function decodeBase64(content) {
   return decodeURIComponent(escape(atob(content.replace(/\n/g, ""))));
 }
 
-function encodeBase64(content) {
+export function encodeBase64(content) {
   return btoa(unescape(encodeURIComponent(content)));
 }
 
@@ -89,6 +92,11 @@ export function formatInboxTimestamp(date = new Date()) {
     minute: "2-digit",
     hour12: false,
   }).format(date).replace(/\u200e/g, "");
+}
+
+export function buildRepoBlobUrl(env, filePath) {
+  const cfg = repoConfig(env);
+  return `https://github.com/${cfg.owner}/${cfg.name}/blob/${cfg.branch}/${filePath}`;
 }
 
 export function formatSortedTimestamp(date = new Date()) {
@@ -151,6 +159,19 @@ export async function listDirectory(env, dirPath, { tolerate404 = false } = {}) 
   return Array.isArray(data) ? data : [];
 }
 
+export async function getDirectoryMarkdownContents(env, dirPath, { tolerate404 = false } = {}) {
+  const files = await listDirectory(env, dirPath, { tolerate404 });
+  const markdownFiles = files.filter((file) => file.name.endsWith(".md"));
+  const results = await Promise.all(
+    markdownFiles.map(async (file) => {
+      const content = await getFile(env, file.path, { tolerate404 });
+      return content ? { path: file.path, content: content.content, sha: content.sha } : null;
+    })
+  );
+
+  return results.filter(Boolean);
+}
+
 export async function putFile(env, filePath, content, { sha, message } = {}) {
   const cfg = repoConfig(env);
   const response = await githubRequest(env, `contents/${filePath}`, {
@@ -158,6 +179,32 @@ export async function putFile(env, filePath, content, { sha, message } = {}) {
     body: JSON.stringify({
       message,
       content: encodeBase64(content),
+      ...(sha ? { sha } : {}),
+      branch: cfg.branch,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new GitHubRepoError(`GitHub commit error: ${response.status} - ${text}`, response.status);
+  }
+
+  const data = await response.json();
+  return {
+    commitSha: data.commit?.sha,
+    contentSha: data.content?.sha,
+    filePath,
+    raw: data,
+  };
+}
+
+export async function putBase64File(env, filePath, base64Content, { sha, message } = {}) {
+  const cfg = repoConfig(env);
+  const response = await githubRequest(env, `contents/${filePath}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      message,
+      content: base64Content,
       ...(sha ? { sha } : {}),
       branch: cfg.branch,
     }),
@@ -286,6 +333,67 @@ export async function appendContextToItem(env, { space, parentItem, text, role =
     commitSha: result.commitSha,
     summary: `Context toegevoegd in ${space === "personal" ? "inbox" : space}.`,
     entry: contextLine.trim(),
+  };
+}
+
+export async function editSpaceItem(env, { space, matchKey, oldText, newText, channel = "web" }) {
+  const filePath = SPACE_FILES[space] || SPACE_FILES.personal;
+  const result = await updateWithRetry(
+    env,
+    filePath,
+    (content) => {
+      const lines = (content || "").split("\n");
+      const blocks = parseFeedBlocks(content || "", { allowAuthor: space !== "personal" });
+      const found = findFeedItem(blocks, { matchKey, rawText: oldText });
+      if (!found) {
+        throw new GitHubRepoError("Item niet gevonden", 404);
+      }
+
+      const oldLine = lines[found.lineIndex];
+      const tsMatch = found.timestamp ? ` *(${found.timestamp})*` : "";
+      const authorPrefix = found.author ? `[${found.author}] ` : "";
+      lines[found.lineIndex] = `- ${authorPrefix}${newText.trim()}${tsMatch}`;
+      return lines.join("\n");
+    },
+    `assistant(${channel}): edit "${newText.trim().slice(0, 50)}"`
+  );
+
+  return {
+    kind: "edit_space_item",
+    filesChanged: [filePath],
+    commitSha: result.commitSha,
+    summary: "Item bijgewerkt.",
+  };
+}
+
+export async function deleteSpaceItem(env, { space, matchKey, rawText, channel = "web" }) {
+  const filePath = SPACE_FILES[space] || SPACE_FILES.personal;
+  const result = await updateWithRetry(
+    env,
+    filePath,
+    (content) => {
+      const lines = (content || "").split("\n");
+      const blocks = parseFeedBlocks(content || "", { allowAuthor: space !== "personal" });
+      const found = findFeedItem(blocks, { matchKey, rawText });
+      if (!found) {
+        throw new GitHubRepoError("Item niet gevonden", 404);
+      }
+
+      let removeCount = 1;
+      while (found.lineIndex + removeCount < lines.length && lines[found.lineIndex + removeCount].startsWith("  - ")) {
+        removeCount += 1;
+      }
+      lines.splice(found.lineIndex, removeCount);
+      return lines.join("\n");
+    },
+    `assistant(${channel}): delete "${(rawText || matchKey || "").slice(0, 50)}"`
+  );
+
+  return {
+    kind: "delete_space_item",
+    filesChanged: [filePath],
+    commitSha: result.commitSha,
+    summary: "Item verwijderd.",
   };
 }
 
@@ -420,6 +528,29 @@ export async function markSortedItemDone(env, { category, itemText, channel = "w
   }
 
   throw new GitHubRepoError("Item niet gevonden", 404);
+}
+
+export async function readOverviewCategories(env) {
+  const categories = {};
+  const entries = Object.entries(SORTED_FILES);
+  const results = await Promise.all(
+    entries.map(async ([key, path]) => {
+      if (path.endsWith("/")) {
+        const files = await getDirectoryMarkdownContents(env, path, { tolerate404: true });
+        const combined = files.map((file) => file.content).join("\n\n");
+        return [key, combined];
+      }
+
+      const file = await getFile(env, path, { tolerate404: true });
+      return [key, file?.content || ""];
+    })
+  );
+
+  for (const [key, content] of results) {
+    categories[key] = parseStructuredOverview(content);
+  }
+
+  return categories;
 }
 
 export async function loadAssistantContext(env, { targetSpace = "auto" } = {}) {

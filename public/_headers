@@ -1,0 +1,5 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: microphone=(self), camera=(), geolocation=(), payment=()
+  Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: https://github.com https://raw.githubusercontent.com; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.github.com https://api.groq.com; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'
