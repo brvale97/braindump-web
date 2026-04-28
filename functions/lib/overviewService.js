@@ -1,6 +1,7 @@
 import {
   SORTED_FILES,
   encodeMatchKey,
+  normalizeLineEndings,
   normalizeTimestamp,
   parseStructuredOverview,
   stripSortedTimestamp,
@@ -78,6 +79,65 @@ function findBlockEnd(lines, startIndex) {
     break;
   }
   return end;
+}
+
+function findHeaderSection(entries, headerText) {
+  if (!headerText) return null;
+  return entries.find((entry) => (
+    entry.type === "header" &&
+    entry.text.toLowerCase() === headerText.toLowerCase()
+  )) || null;
+}
+
+function findSectionEnd(lines, entries, header) {
+  const nextHeader = entries.find((entry) => (
+    entry.type === "header" &&
+    entry.lineIndex > header.lineIndex &&
+    entry.level <= header.level
+  ));
+  return nextHeader ? nextHeader.lineIndex : lines.length;
+}
+
+function findInsertIndex(content, { targetHeader, beforeMatchKey, position = "end" }) {
+  const lines = normalizeLineEndings(content || "").split("\n");
+  const entries = parseStructuredOverview(content || "");
+
+  if (beforeMatchKey) {
+    const before = entries.find((entry) => entry.type === "item" && entry.matchKey === beforeMatchKey);
+    if (before) return before.lineIndex;
+  }
+
+  const header = findHeaderSection(entries, targetHeader);
+  if (!header) {
+    return lines.length;
+  }
+
+  if (position === "start") {
+    return header.lineIndex + 1;
+  }
+
+  return findSectionEnd(lines, entries, header);
+}
+
+function moveBlockInContent(content, { matchKey, itemText, blockLines, targetHeader, beforeMatchKey, position }) {
+  const lines = normalizeLineEndings(content || "").split("\n");
+  const entries = parseStructuredOverview(content || "");
+  const found = entries.find((entry) => entry.type === "item" && itemMatches(entry, { matchKey, itemText }));
+  const sourceBlockLines = blockLines || (found ? lines.slice(found.lineIndex, findBlockEnd(lines, found.lineIndex)) : null);
+  if (!sourceBlockLines) throw new GitHubRepoError("Item niet gevonden", 404);
+
+  let insertIndex = findInsertIndex(content, { targetHeader, beforeMatchKey, position });
+
+  if (found) {
+    const end = findBlockEnd(lines, found.lineIndex);
+    lines.splice(found.lineIndex, end - found.lineIndex);
+    if (insertIndex > found.lineIndex) {
+      insertIndex -= end - found.lineIndex;
+    }
+  }
+
+  lines.splice(Math.max(0, insertIndex), 0, ...sourceBlockLines);
+  return lines.join("\n");
 }
 
 export async function listOverview(env) {
@@ -220,6 +280,76 @@ export async function moveOverviewItem(env, { fromCategory, toCategory, matchKey
       return lines.join("\n");
     },
     `assistant(${channel}): move "${(itemText || matchKey || "").slice(0, 40)}" → ${toCategory}`
+  );
+
+  return { ok: true };
+}
+
+export async function organizeOverviewItem(env, {
+  fromCategory,
+  toCategory,
+  matchKey,
+  itemText,
+  targetHeader,
+  beforeMatchKey,
+  position = "end",
+  channel = "web",
+}) {
+  if (!fromCategory || !toCategory) throw new GitHubRepoError("Bron en doel zijn vereist", 400);
+
+  const source = await findOverviewItem(env, fromCategory, { matchKey, itemText });
+  if (!source) throw new GitHubRepoError("Item niet gevonden in broncategorie", 404);
+
+  const sourceLines = normalizeLineEndings(source.file.content || "").split("\n");
+  const blockEnd = findBlockEnd(sourceLines, source.found.lineIndex);
+  const blockLines = sourceLines.slice(source.found.lineIndex, blockEnd);
+  const sameCategory = fromCategory === toCategory;
+
+  if (sameCategory) {
+    await updateWithRetry(
+      env,
+      source.file.path,
+      (content) => moveBlockInContent(content, {
+        matchKey,
+        itemText,
+        targetHeader,
+        beforeMatchKey,
+        position,
+      }),
+      `assistant(${channel}): organize ${fromCategory}`
+    );
+    return { ok: true };
+  }
+
+  await updateWithRetry(
+    env,
+    source.file.path,
+    (content) => {
+      const lines = normalizeLineEndings(content || "").split("\n");
+      const entries = parseStructuredOverview(content || "");
+      const found = entries.find((entry) => entry.type === "item" && itemMatches(entry, { matchKey, itemText }));
+      if (!found) throw new GitHubRepoError("Item niet gevonden in broncategorie", 404);
+      const end = findBlockEnd(lines, found.lineIndex);
+      lines.splice(found.lineIndex, end - found.lineIndex);
+      return lines.join("\n");
+    },
+    `assistant(${channel}): organize ${fromCategory} → ${toCategory}`
+  );
+
+  const destFiles = await categoryFiles(env, toCategory);
+  const destPath = destFiles[0];
+  if (!destPath) throw new GitHubRepoError("Doelbestand niet gevonden", 404);
+
+  await updateWithRetry(
+    env,
+    destPath,
+    (content) => moveBlockInContent(content, {
+      blockLines,
+      targetHeader,
+      beforeMatchKey,
+      position,
+    }),
+    `assistant(${channel}): organize ${fromCategory} → ${toCategory}`
   );
 
   return { ok: true };

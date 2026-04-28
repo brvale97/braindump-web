@@ -39,6 +39,53 @@ function sortEntries(entries) {
   return onlyItems;
 }
 
+function reorderEntriesByMove(entries, matchKey, targetHeader, beforeMatchKey, position = "end") {
+  const moved = entries.find((entry) => entry.type === "item" && entry.matchKey === matchKey);
+  if (!moved) return entries;
+
+  const withoutMoved = entries.filter((entry) => entry !== moved);
+  let insertIndex = withoutMoved.length;
+
+  if (beforeMatchKey) {
+    const beforeIndex = withoutMoved.findIndex((entry) => entry.type === "item" && entry.matchKey === beforeMatchKey);
+    if (beforeIndex !== -1) insertIndex = beforeIndex;
+  } else if (targetHeader) {
+    const headerIndex = withoutMoved.findIndex((entry) => (
+      entry.type === "header" &&
+      entry.text.toLowerCase() === targetHeader.toLowerCase()
+    ));
+    if (headerIndex !== -1) {
+      if (position === "start") {
+        insertIndex = headerIndex + 1;
+      } else {
+        const headerLevel = withoutMoved[headerIndex].level || 2;
+        insertIndex = withoutMoved.length;
+        for (let index = headerIndex + 1; index < withoutMoved.length; index += 1) {
+          const entry = withoutMoved[index];
+          if (entry.type === "header" && (entry.level || 2) <= headerLevel) {
+            insertIndex = index;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  withoutMoved.splice(insertIndex, 0, moved);
+  return withoutMoved;
+}
+
+function moveEntryBetweenCategories(data, fromCategory, toCategory, matchKey, targetHeader, beforeMatchKey, position) {
+  const next = { ...data };
+  const sourceEntries = [...(next[fromCategory] || [])];
+  const moved = sourceEntries.find((entry) => entry.type === "item" && entry.matchKey === matchKey);
+  if (!moved) return next;
+
+  next[fromCategory] = sourceEntries.filter((entry) => entry !== moved);
+  next[toCategory] = reorderEntriesByMove([...(next[toCategory] || []), moved], matchKey, targetHeader, beforeMatchKey, position);
+  return next;
+}
+
 export class OverviewController {
   constructor(config) {
     this.elements = config;
@@ -127,6 +174,7 @@ export class OverviewController {
 
     const card = document.createElement("div");
     card.className = "overview-card";
+    card.dataset.category = state.activeCategory;
     this.renderItemsIntoCard(card, sortEntries(entries), state.activeCategory);
     this.elements.content.appendChild(card);
   }
@@ -159,6 +207,7 @@ export class OverviewController {
         hasItems = true;
         const card = document.createElement("div");
         card.className = `overview-card zone-card zone-card-${zone.key}`;
+        card.dataset.category = category;
         const title = document.createElement("div");
         title.className = "overview-card-title";
         title.textContent = categoryLabels[category] || category;
@@ -178,12 +227,16 @@ export class OverviewController {
 
   renderItemsIntoCard(card, entries, category) {
     let lastHeaderLevel = 1;
+    let lastHeaderText = "";
     entries.forEach((entry) => {
       if (entry.type === "header") {
         lastHeaderLevel = entry.level || 2;
+        lastHeaderText = entry.text;
         const header = document.createElement("div");
         header.className = `overview-header-item${lastHeaderLevel >= 3 ? " sub-header" : ""}`;
         header.textContent = entry.text;
+        header.dataset.category = category;
+        header.dataset.section = entry.text;
         card.appendChild(header);
         return;
       }
@@ -192,11 +245,12 @@ export class OverviewController {
       row.className = `overview-item${lastHeaderLevel >= 3 ? " sub-item" : ""}${entry.isClaudeItem ? " claude-item" : ""}`;
       row.dataset.matchKey = entry.matchKey;
       row.dataset.category = category;
+      row.dataset.section = lastHeaderText;
 
       const handle = document.createElement("div");
       handle.className = "drag-handle";
       handle.innerHTML = gripSvg;
-      if (state.sortNewest || state.activeCategory === "alles" || state.overviewQuery) {
+      if (state.sortNewest || state.overviewQuery || category === "code") {
         handle.classList.add("hidden");
       }
 
@@ -424,14 +478,12 @@ export class OverviewController {
   startDrag(event, handle) {
     const row = handle.closest(".overview-item");
     const card = row?.closest(".overview-card");
-    if (!row || !card || event.button !== 0 || state.sortNewest || state.activeCategory === "alles" || state.overviewQuery) {
+    if (!row || !card || event.button !== 0 || state.sortNewest || state.overviewQuery || row.dataset.category === "code") {
       return;
     }
 
     event.preventDefault();
-    const rect = row.getBoundingClientRect();
-    const items = [...card.querySelectorAll(".overview-item")];
-    const startIndex = items.indexOf(row);
+    row.setPointerCapture?.(event.pointerId);
     const ghost = document.createElement("div");
     ghost.className = "drag-ghost";
     ghost.textContent = row.querySelector(".item-main")?.textContent || "";
@@ -440,74 +492,128 @@ export class OverviewController {
     document.body.appendChild(ghost);
 
     row.classList.add("dragging");
-    this.dragState = { row, card, ghost, startIndex, currentIndex: startIndex, items, pointerId: event.pointerId, indicator: null };
+    this.dragState = {
+      row,
+      sourceCard: card,
+      ghost,
+      pointerId: event.pointerId,
+      indicator: null,
+      drop: null,
+      sourceCategory: row.dataset.category,
+      matchKey: row.dataset.matchKey,
+    };
   }
 
   moveDrag(event) {
-    const { ghost, card, row, items } = this.dragState;
+    const { ghost, row } = this.dragState;
     ghost.style.left = `${event.clientX + 12}px`;
     ghost.style.top = `${event.clientY - 16}px`;
     this.dragState.indicator?.remove();
     this.dragState.indicator = null;
+    this.dragState.drop = null;
 
-    let targetIndex = items.length;
-    for (let index = 0; index < items.length; index += 1) {
-      const item = items[index];
-      if (item === row) continue;
-      const rect = item.getBoundingClientRect();
+    const element = document.elementFromPoint(event.clientX, event.clientY);
+    const card = element?.closest(".overview-card");
+    const targetCategory = card?.dataset.category;
+    if (!card || !targetCategory || targetCategory === "code") return;
+
+    const anchors = [...card.querySelectorAll(".overview-header-item, .overview-item")].filter((node) => node !== row);
+    if (anchors.length === 0) return;
+
+    let anchor = anchors[anchors.length - 1];
+    let placement = "after";
+    for (const candidate of anchors) {
+      const rect = candidate.getBoundingClientRect();
       if (event.clientY < rect.top + rect.height / 2) {
-        targetIndex = index;
+        anchor = candidate;
+        placement = "before";
         break;
       }
     }
 
-    const startIndex = items.indexOf(row);
-    if (targetIndex > startIndex) targetIndex -= 1;
-    this.dragState.currentIndex = targetIndex;
-
     const indicator = document.createElement("div");
     indicator.className = "drop-indicator";
-    const currentItems = [...card.querySelectorAll(".overview-item")];
-    if (targetIndex < startIndex && currentItems[targetIndex]) {
-      currentItems[targetIndex].before(indicator);
-    } else if (currentItems[targetIndex + (targetIndex >= startIndex ? 1 : 0)]) {
-      currentItems[targetIndex + (targetIndex >= startIndex ? 1 : 0)].before(indicator);
+
+    let drop;
+    if (anchor.classList.contains("overview-header-item")) {
+      anchor.after(indicator);
+      drop = {
+        targetCategory,
+        targetHeader: anchor.dataset.section || "",
+        beforeMatchKey: null,
+        position: "start",
+      };
+    } else if (placement === "before") {
+      anchor.before(indicator);
+      drop = {
+        targetCategory,
+        targetHeader: anchor.dataset.section || "",
+        beforeMatchKey: anchor.dataset.matchKey,
+        position: "before",
+      };
     } else {
-      currentItems[currentItems.length - 1]?.after(indicator);
+      anchor.after(indicator);
+      const items = [...card.querySelectorAll(".overview-item")].filter((item) => item !== row);
+      const anchorIndex = items.indexOf(anchor);
+      const nextItem = items.slice(anchorIndex + 1).find((item) => item.dataset.section === anchor.dataset.section);
+      drop = {
+        targetCategory,
+        targetHeader: anchor.dataset.section || "",
+        beforeMatchKey: nextItem?.dataset.matchKey || null,
+        position: nextItem ? "before" : "end",
+      };
     }
+
     this.dragState.indicator = indicator;
+    this.dragState.drop = drop;
   }
 
   async endDrag() {
-    const { row, ghost, card, startIndex, currentIndex, indicator } = this.dragState;
+    const { row, ghost, indicator, drop, sourceCategory, matchKey } = this.dragState;
     row.classList.remove("dragging");
     ghost.remove();
-    indicator?.remove();
+    if (!drop || !indicator) {
+      indicator?.remove();
+      this.dragState = null;
+      return;
+    }
+    indicator.replaceWith(row);
     this.dragState = null;
-    if (startIndex === currentIndex) return;
 
-    const items = [...card.querySelectorAll(".overview-item")];
-    const target = items[currentIndex + (currentIndex > startIndex ? 1 : 0)];
-    if (target) target.before(row);
-    else items[items.length - 1]?.after(row);
-
-    const orderedMatchKeys = [...card.querySelectorAll(".overview-item")].map((item) => item.dataset.matchKey).filter(Boolean);
     try {
       await apiFetch("/api/overview", {
         method: "PATCH",
         body: JSON.stringify({
-          action: "reorder",
-          category: state.activeCategory,
-          orderedMatchKeys,
+          action: "organize",
+          fromCategory: sourceCategory,
+          toCategory: drop.targetCategory,
+          matchKey,
+          targetHeader: drop.targetHeader,
+          beforeMatchKey: drop.beforeMatchKey,
+          position: drop.position,
         }),
       });
-      const orderMap = new Map(orderedMatchKeys.map((key, index) => [key, index]));
-      state.overviewData[state.activeCategory] = [...(state.overviewData[state.activeCategory] || [])].sort((left, right) => {
-        if (left.type === "header") return -1;
-        if (right.type === "header") return 1;
-        return (orderMap.get(left.matchKey) ?? 9999) - (orderMap.get(right.matchKey) ?? 9999);
-      });
-      setOverviewData({ ...state.overviewData });
+      if (sourceCategory === drop.targetCategory) {
+        state.overviewData[sourceCategory] = reorderEntriesByMove(
+          [...(state.overviewData[sourceCategory] || [])],
+          matchKey,
+          drop.targetHeader,
+          drop.beforeMatchKey,
+          drop.position
+        );
+        setOverviewData({ ...state.overviewData });
+      } else {
+        setOverviewData(moveEntryBetweenCategories(
+          state.overviewData,
+          sourceCategory,
+          drop.targetCategory,
+          matchKey,
+          drop.targetHeader,
+          drop.beforeMatchKey,
+          drop.position
+        ));
+      }
+      this.render();
     } catch (error) {
       showToast(error.message || "Herschikken mislukt", "error");
       this.render();
