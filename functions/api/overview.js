@@ -5,6 +5,7 @@ import {
   listOverview,
   markOverviewItemDone,
   moveOverviewItem,
+  organizeOverviewItem,
   reorderOverviewItems,
 } from "../lib/overviewService.js";
 
@@ -64,7 +65,21 @@ export async function onRequestPatch(context) {
 
   try {
     const body = await context.request.json();
-    const { category, matchKey, itemText, newText, context: text, action, orderedItems, orderedMatchKeys } = body;
+    const {
+      category,
+      matchKey,
+      itemText,
+      newText,
+      context: text,
+      action,
+      orderedItems,
+      orderedMatchKeys,
+      fromCategory,
+      toCategory,
+      targetHeader,
+      beforeMatchKey,
+      position,
+    } = body;
 
     if (action === "reorder") {
       if (!category || (!orderedMatchKeys && !orderedItems)) {
@@ -73,6 +88,21 @@ export async function onRequestPatch(context) {
       return Response.json(await reorderOverviewItems(context.env, {
         category,
         orderedMatchKeys: orderedMatchKeys || orderedItems,
+      }));
+    }
+
+    if (action === "organize") {
+      if (!fromCategory || !toCategory || (!matchKey && !itemText)) {
+        return Response.json({ error: "fromCategory, toCategory en matchKey/itemText zijn vereist" }, { status: 400 });
+      }
+      return Response.json(await organizeOverviewItem(context.env, {
+        fromCategory,
+        toCategory,
+        matchKey,
+        itemText,
+        targetHeader,
+        beforeMatchKey,
+        position,
       }));
     }
 
