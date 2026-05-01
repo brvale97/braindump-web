@@ -51,12 +51,14 @@ test("bram flow shows personal tabs and overview data", async ({ page }) => {
 
 test("anna flow only exposes shared tab", async ({ page }) => {
   let sharedOverview = [
-    { type: "header", text: "Fysiek", level: 2 },
-    { type: "header", text: "Tuin", level: 3 },
+    { type: "header", text: "Huis", level: 2 },
+    { type: "header", text: "🔴 Urgent", level: 3 },
     { type: "item", matchKey: "s1", text: "Tuintafel schoonmaken", timestamp: "2026-05-01 15:39", contexts: [] },
+    { type: "header", text: "Tuin", level: 2 },
+    { type: "header", text: "🟡 Binnenkort", level: 3 },
     { type: "item", matchKey: "s2", text: "Voortuin snoeien", timestamp: "2026-04-28 14:33", contexts: [] },
-    { type: "header", text: "Persoonlijk", level: 2 },
-    { type: "header", text: "Afspraken", level: 3 },
+    { type: "header", text: "Afspraken", level: 2 },
+    { type: "header", text: "🔴 Urgent", level: 3 },
     { type: "item", matchKey: "s3", text: "Naar Polen", timestamp: "2026-04-28 14:27", contexts: [] },
   ];
   await page.route("**/api/auth", async (route) => {
@@ -92,9 +94,9 @@ test("anna flow only exposes shared tab", async ({ page }) => {
   await expect(page.getByPlaceholder("Zoek in Anna/Bram")).toBeVisible();
   await expect(page.getByText("Tuintafel schoonmaken")).toBeVisible();
   await expect(page.getByRole("button", { name: "Alles" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "GEP" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Fysiek" })).toBeVisible();
-  await page.getByRole("button", { name: "Persoonlijk" }).click();
+  await expect(page.getByRole("button", { name: "Huis", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Tuin", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Afspraken", exact: true }).click();
   await expect(page.getByText("Naar Polen")).toBeVisible();
   await expect(page.getByText("Tuintafel schoonmaken")).toBeHidden();
   await page.getByRole("button", { name: "Markeer als klaar: Naar Polen" }).click();

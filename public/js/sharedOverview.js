@@ -11,27 +11,31 @@ import { escapeHtml, formatTimestamp, renderMarkdown, showToast, toProxyUrl } fr
 const gripSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>';
 
 const ALL_CATEGORY = "alles";
-const FALLBACK_CATEGORY = "werk";
-
 const categoryLabels = {
-  werk: "GEP",
-  fysiek: "Fysiek",
-  code: "Code",
-  persoonlijk: "Persoonlijk",
-  someday: "Someday",
+  huis: "Huis",
+  tuin: "Tuin",
+  afspraken: "Afspraken",
+  boodschappen: "Boodschappen",
+  later: "Later",
 };
 
 const categoryAliases = new Map([
-  ["gep", "werk"],
-  ["werk", "werk"],
-  ["lijst", "werk"],
-  ["algemeen", "werk"],
-  ["fysiek", "fysiek"],
-  ["fysieke-taken", "fysiek"],
-  ["code", "code"],
-  ["persoonlijk", "persoonlijk"],
-  ["someday", "someday"],
-  ["someday-misschien-later", "someday"],
+  ["huis", "huis"],
+  ["klussen", "huis"],
+  ["onderhoud", "huis"],
+  ["fysiek", "huis"],
+  ["fysieke-taken", "huis"],
+  ["tuin", "tuin"],
+  ["afspraken", "afspraken"],
+  ["planning", "afspraken"],
+  ["persoonlijk", "afspraken"],
+  ["boodschappen", "boodschappen"],
+  ["kopen", "boodschappen"],
+  ["later", "later"],
+  ["someday", "later"],
+  ["someday-misschien-later", "later"],
+  ["lijst", "huis"],
+  ["algemeen", "huis"],
 ]);
 
 function slugify(value) {
@@ -69,7 +73,7 @@ function groupedSharedEntries(entries) {
   const categories = Object.fromEntries(
     Object.keys(categoryLabels).map((key) => [key, { key, label: categoryLabels[key], entries: [] }])
   );
-  let currentKey = FALLBACK_CATEGORY;
+  let currentKey = "huis";
 
   for (const entry of entries || []) {
     if (entry.type === "header") {
@@ -235,40 +239,21 @@ export class SharedOverviewController {
 
   renderAllCategories() {
     this.renderFocusSummary();
-    const zones = [
-      { key: "claude", title: "Codex kan dit oppakken", categories: ["code"] },
-      { key: "jij", title: "Jij zelf", categories: ["werk", "fysiek", "persoonlijk", "someday"] },
-    ];
-
     let hasItems = false;
-    for (const zone of zones) {
-      const zoneCategories = zone.categories
-        .map((key) => this.categories.find((category) => category.key === key))
-        .filter(Boolean);
-      if (!zoneCategories.some((category) => this.filteredEntries(category.entries).some((entry) => entry.type !== "header"))) {
-        continue;
-      }
+    for (const category of this.categories) {
+      const entries = this.filteredEntries(category.entries);
+      if (!entries.some((entry) => entry.type !== "header")) continue;
 
-      const header = document.createElement("div");
-      header.className = `zone-header zone-${zone.key}`;
-      header.textContent = zone.title;
-      this.elements.content.appendChild(header);
-
-      for (const category of zoneCategories) {
-        const entries = this.filteredEntries(category.entries);
-        if (!entries.some((entry) => entry.type !== "header")) continue;
-
-        hasItems = true;
-        const card = document.createElement("div");
-        card.className = `overview-card shared-overview-card zone-card zone-card-${zone.key}`;
-        card.dataset.category = category.key;
-        const title = document.createElement("div");
-        title.className = "overview-card-title";
-        title.textContent = category.label;
-        card.appendChild(title);
-        this.renderItemsIntoCard(card, sortEntries(entries), category.key);
-        this.elements.content.appendChild(card);
-      }
+      hasItems = true;
+      const card = document.createElement("div");
+      card.className = "overview-card shared-overview-card zone-card zone-card-jij";
+      card.dataset.category = category.key;
+      const title = document.createElement("div");
+      title.className = "overview-card-title";
+      title.textContent = category.label;
+      card.appendChild(title);
+      this.renderItemsIntoCard(card, sortEntries(entries), category.key);
+      this.elements.content.appendChild(card);
     }
 
     if (!hasItems) this.renderEmpty();
@@ -332,7 +317,7 @@ export class SharedOverviewController {
       const handle = document.createElement("div");
       handle.className = "drag-handle";
       handle.innerHTML = gripSvg;
-      if (state.sharedOverviewSortNewest || state.sharedOverviewQuery || category === "code") {
+      if (state.sharedOverviewSortNewest || state.sharedOverviewQuery) {
         handle.classList.add("hidden");
       }
 
@@ -390,7 +375,7 @@ export class SharedOverviewController {
   startDrag(event, handle) {
     const row = handle.closest(".overview-item");
     const card = row?.closest(".overview-card");
-    if (!row || !card || event.button !== 0 || state.sharedOverviewSortNewest || state.sharedOverviewQuery || row.dataset.category === "code") {
+    if (!row || !card || event.button !== 0 || state.sharedOverviewSortNewest || state.sharedOverviewQuery) {
       return;
     }
 
@@ -425,7 +410,7 @@ export class SharedOverviewController {
     const element = document.elementFromPoint(event.clientX, event.clientY);
     const card = element?.closest(".overview-card");
     const targetCategory = card?.dataset.category;
-    if (!card || !targetCategory || targetCategory === "code") return;
+    if (!card || !targetCategory) return;
 
     const anchors = [...card.querySelectorAll(".overview-header-item, .overview-item")].filter((node) => node !== row);
     if (anchors.length === 0) return;

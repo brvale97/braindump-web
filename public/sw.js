@@ -1,4 +1,4 @@
-const CACHE_NAME = "braindump-shell-v6";
+const CACHE_NAME = "braindump-shell-v7";
 const APP_SHELL = [
   "/",
   "/index.html",
