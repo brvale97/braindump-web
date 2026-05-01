@@ -50,6 +50,15 @@ test("bram flow shows personal tabs and overview data", async ({ page }) => {
 });
 
 test("anna flow only exposes shared tab", async ({ page }) => {
+  let sharedOverview = [
+    { type: "header", text: "Fysiek", level: 2 },
+    { type: "header", text: "Tuin", level: 3 },
+    { type: "item", matchKey: "s1", text: "Tuintafel schoonmaken", timestamp: "2026-05-01 15:39", contexts: [] },
+    { type: "item", matchKey: "s2", text: "Voortuin snoeien", timestamp: "2026-04-28 14:33", contexts: [] },
+    { type: "header", text: "Persoonlijk", level: 2 },
+    { type: "header", text: "Afspraken", level: 3 },
+    { type: "item", matchKey: "s3", text: "Naar Polen", timestamp: "2026-04-28 14:27", contexts: [] },
+  ];
   await page.route("**/api/auth", async (route) => {
     await route.fulfill({
       status: 200,
@@ -58,20 +67,18 @@ test("anna flow only exposes shared tab", async ({ page }) => {
     });
   });
   await page.route("**/api/shared", async (route) => {
+    if (route.request().method() === "PATCH") {
+      const body = route.request().postDataJSON();
+      if (body.action === "done") {
+        sharedOverview = sharedOverview.filter((entry) => entry.matchKey !== body.matchKey);
+      }
+    }
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
         items: [{ matchKey: "a", text: "Samen doen", timestamp: "2026-04-28 11:00", author: "Bram", contexts: [], attachment: null }],
-        overview: [
-          { type: "header", text: "Fysiek", level: 2 },
-          { type: "header", text: "Tuin", level: 3 },
-          { type: "item", matchKey: "s1", text: "Tuintafel schoonmaken", timestamp: "2026-05-01 15:39", contexts: [] },
-          { type: "item", matchKey: "s2", text: "Voortuin snoeien", timestamp: "2026-04-28 14:33", contexts: [] },
-          { type: "header", text: "Persoonlijk", level: 2 },
-          { type: "header", text: "Afspraken", level: 3 },
-          { type: "item", matchKey: "s3", text: "Naar Polen", timestamp: "2026-04-28 14:27", contexts: [] },
-        ],
+        overview: sharedOverview,
       }),
     });
   });
@@ -90,6 +97,8 @@ test("anna flow only exposes shared tab", async ({ page }) => {
   await page.getByRole("button", { name: "Persoonlijk" }).click();
   await expect(page.getByText("Naar Polen")).toBeVisible();
   await expect(page.getByText("Tuintafel schoonmaken")).toBeHidden();
+  await page.getByRole("button", { name: "Markeer als klaar: Naar Polen" }).click();
+  await expect(page.getByText("Naar Polen")).toBeHidden();
   await expect(page.getByText("Samen doen")).toBeHidden();
 });
 

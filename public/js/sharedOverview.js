@@ -1,10 +1,14 @@
 import {
   setActiveSharedCategory,
+  setSharedOverviewData,
   setSharedOverviewQuery,
   setSharedOverviewSortNewest,
   state,
 } from "./state.js";
-import { escapeHtml, formatTimestamp, renderMarkdown, toProxyUrl } from "./ui.js";
+import { apiFetch } from "./api.js";
+import { escapeHtml, formatTimestamp, renderMarkdown, showToast, toProxyUrl } from "./ui.js";
+
+const gripSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>';
 
 const ALL_CATEGORY = "alles";
 const FALLBACK_CATEGORY = "werk";
@@ -114,6 +118,7 @@ export class SharedOverviewController {
   constructor(config) {
     this.elements = config;
     this.categories = [];
+    this.dragState = null;
   }
 
   bind() {
@@ -129,6 +134,18 @@ export class SharedOverviewController {
       this.updateSortButton();
       this.render();
     });
+
+    this.elements.content.addEventListener("pointerdown", (event) => {
+      const handle = event.target.closest(".drag-handle");
+      if (handle) this.startDrag(event, handle);
+    });
+    this.elements.content.addEventListener("pointermove", (event) => {
+      if (this.dragState) this.moveDrag(event);
+    });
+    this.elements.content.addEventListener("pointerup", () => {
+      if (this.dragState) this.endDrag();
+    });
+    this.elements.content.addEventListener("pointercancel", () => this.cancelDrag());
   }
 
   updateSortButton() {
@@ -194,7 +211,7 @@ export class SharedOverviewController {
   render() {
     this.categories = groupedSharedEntries(state.sharedOverviewData || []);
     this.renderCategoryTabs();
-    this.elements.content.querySelectorAll(".overview-card, .empty").forEach((node) => node.remove());
+    this.elements.content.querySelectorAll(".focus-summary, .overview-card, .empty, .zone-header").forEach((node) => node.remove());
     this.elements.loading.classList.add("hidden");
 
     if (state.activeSharedCategory === ALL_CATEGORY) {
@@ -211,7 +228,8 @@ export class SharedOverviewController {
 
     const card = document.createElement("div");
     card.className = "overview-card shared-overview-card";
-    this.renderItemsIntoCard(card, sortEntries(entries));
+    card.dataset.category = category.key;
+    this.renderItemsIntoCard(card, sortEntries(entries), category.key);
     this.elements.content.appendChild(card);
   }
 
@@ -243,11 +261,12 @@ export class SharedOverviewController {
         hasItems = true;
         const card = document.createElement("div");
         card.className = `overview-card shared-overview-card zone-card zone-card-${zone.key}`;
+        card.dataset.category = category.key;
         const title = document.createElement("div");
         title.className = "overview-card-title";
         title.textContent = category.label;
         card.appendChild(title);
-        this.renderItemsIntoCard(card, sortEntries(entries));
+        this.renderItemsIntoCard(card, sortEntries(entries), category.key);
         this.elements.content.appendChild(card);
       }
     }
@@ -287,25 +306,42 @@ export class SharedOverviewController {
     this.elements.content.appendChild(empty);
   }
 
-  renderItemsIntoCard(card, entries) {
+  renderItemsIntoCard(card, entries, category) {
     let lastHeaderLevel = 1;
+    let lastHeaderText = "";
 
     for (const entry of entries) {
       if (entry.type === "header") {
         lastHeaderLevel = entry.level || 2;
+        lastHeaderText = entry.text;
         const header = document.createElement("div");
         header.className = `overview-header-item${lastHeaderLevel >= 3 ? " sub-header" : ""}`;
         header.textContent = entry.text;
+        header.dataset.category = category;
+        header.dataset.section = entry.text;
         card.appendChild(header);
         continue;
       }
 
       const row = document.createElement("div");
       row.className = `overview-item shared-overview-item${lastHeaderLevel >= 3 ? " sub-item" : ""}`;
+      row.dataset.matchKey = entry.matchKey;
+      row.dataset.category = category;
+      row.dataset.section = lastHeaderText;
 
-      const circle = document.createElement("div");
-      circle.className = "circle shared-readonly-circle";
-      circle.setAttribute("aria-hidden", "true");
+      const handle = document.createElement("div");
+      handle.className = "drag-handle";
+      handle.innerHTML = gripSvg;
+      if (state.sharedOverviewSortNewest || state.sharedOverviewQuery || category === "code") {
+        handle.classList.add("hidden");
+      }
+
+      const circle = document.createElement("button");
+      circle.className = "circle";
+      circle.type = "button";
+      circle.title = "Markeer als klaar";
+      circle.setAttribute("aria-label", `Markeer als klaar: ${entry.text}`);
+      circle.addEventListener("click", () => this.markDone(entry, row));
 
       const textWrap = document.createElement("div");
       textWrap.className = "item-text";
@@ -327,8 +363,154 @@ export class SharedOverviewController {
       });
       textWrap.appendChild(contexts);
 
-      row.append(circle, textWrap);
+      row.append(handle, circle, textWrap);
       card.appendChild(row);
     }
+  }
+
+  async markDone(entry, row) {
+    row.classList.add("completed");
+    try {
+      const data = await apiFetch("/api/shared", {
+        method: "PATCH",
+        body: JSON.stringify({
+          action: "done",
+          matchKey: entry.matchKey,
+        }),
+      });
+      setSharedOverviewData(data.overview || []);
+      row.style.opacity = "0";
+      setTimeout(() => this.render(), 220);
+    } catch (error) {
+      row.classList.remove("completed");
+      showToast(error.message || "Afvinken mislukt", "error");
+    }
+  }
+
+  startDrag(event, handle) {
+    const row = handle.closest(".overview-item");
+    const card = row?.closest(".overview-card");
+    if (!row || !card || event.button !== 0 || state.sharedOverviewSortNewest || state.sharedOverviewQuery || row.dataset.category === "code") {
+      return;
+    }
+
+    event.preventDefault();
+    row.setPointerCapture?.(event.pointerId);
+    const ghost = document.createElement("div");
+    ghost.className = "drag-ghost";
+    ghost.textContent = row.querySelector(".item-main")?.textContent || "";
+    ghost.style.left = `${event.clientX + 12}px`;
+    ghost.style.top = `${event.clientY - 16}px`;
+    document.body.appendChild(ghost);
+
+    row.classList.add("dragging");
+    this.dragState = {
+      row,
+      ghost,
+      pointerId: event.pointerId,
+      indicator: null,
+      drop: null,
+      matchKey: row.dataset.matchKey,
+    };
+  }
+
+  moveDrag(event) {
+    const { ghost, row } = this.dragState;
+    ghost.style.left = `${event.clientX + 12}px`;
+    ghost.style.top = `${event.clientY - 16}px`;
+    this.dragState.indicator?.remove();
+    this.dragState.indicator = null;
+    this.dragState.drop = null;
+
+    const element = document.elementFromPoint(event.clientX, event.clientY);
+    const card = element?.closest(".overview-card");
+    const targetCategory = card?.dataset.category;
+    if (!card || !targetCategory || targetCategory === "code") return;
+
+    const anchors = [...card.querySelectorAll(".overview-header-item, .overview-item")].filter((node) => node !== row);
+    if (anchors.length === 0) return;
+
+    let anchor = anchors[anchors.length - 1];
+    let placement = "after";
+    for (const candidate of anchors) {
+      const rect = candidate.getBoundingClientRect();
+      if (event.clientY < rect.top + rect.height / 2) {
+        anchor = candidate;
+        placement = "before";
+        break;
+      }
+    }
+
+    const indicator = document.createElement("div");
+    indicator.className = "drop-indicator";
+
+    let drop;
+    if (anchor.classList.contains("overview-header-item")) {
+      anchor.after(indicator);
+      drop = {
+        targetHeader: anchor.dataset.section || "",
+        beforeMatchKey: null,
+        position: "start",
+      };
+    } else if (placement === "before") {
+      anchor.before(indicator);
+      drop = {
+        targetHeader: anchor.dataset.section || "",
+        beforeMatchKey: anchor.dataset.matchKey,
+        position: "before",
+      };
+    } else {
+      anchor.after(indicator);
+      const items = [...card.querySelectorAll(".overview-item")].filter((item) => item !== row);
+      const anchorIndex = items.indexOf(anchor);
+      const nextItem = items.slice(anchorIndex + 1).find((item) => item.dataset.section === anchor.dataset.section);
+      drop = {
+        targetHeader: anchor.dataset.section || "",
+        beforeMatchKey: nextItem?.dataset.matchKey || null,
+        position: nextItem ? "before" : "end",
+      };
+    }
+
+    this.dragState.indicator = indicator;
+    this.dragState.drop = drop;
+  }
+
+  async endDrag() {
+    const { row, ghost, indicator, drop, matchKey } = this.dragState;
+    row.classList.remove("dragging");
+    ghost.remove();
+    if (!drop || !indicator) {
+      indicator?.remove();
+      this.dragState = null;
+      return;
+    }
+    indicator.replaceWith(row);
+    this.dragState = null;
+
+    try {
+      const data = await apiFetch("/api/shared", {
+        method: "PATCH",
+        body: JSON.stringify({
+          action: "organize",
+          matchKey,
+          targetHeader: drop.targetHeader,
+          beforeMatchKey: drop.beforeMatchKey,
+          position: drop.position,
+        }),
+      });
+      setSharedOverviewData(data.overview || []);
+      this.render();
+    } catch (error) {
+      showToast(error.message || "Herschikken mislukt", "error");
+      this.render();
+    }
+  }
+
+  cancelDrag() {
+    if (!this.dragState) return;
+    this.dragState.row.classList.remove("dragging");
+    this.dragState.ghost.remove();
+    this.dragState.indicator?.remove();
+    this.dragState = null;
   }
 }

@@ -13,6 +13,7 @@ import {
   deleteSpaceItem,
   editSpaceItem,
   getFile,
+  updateWithRetry,
 } from "./githubRepo.js";
 
 function allowAuthorForSpace(space) {
@@ -45,6 +46,121 @@ export async function listSharedOverview(env, { noCache = false } = {}) {
       })),
     };
   });
+}
+
+function itemMatches(entry, { matchKey, itemText }) {
+  return (
+    (matchKey && entry.matchKey === matchKey) ||
+    (itemText && (entry.text === itemText || entry.rawText === itemText))
+  );
+}
+
+function findBlockEnd(lines, startIndex) {
+  let end = startIndex + 1;
+  while (end < lines.length) {
+    const next = lines[end];
+    const nextTrimmed = next.trim();
+    const indent = next.length - next.trimStart().length;
+    if (indent >= 2 && (nextTrimmed.startsWith("- ") || nextTrimmed.startsWith("* "))) {
+      end += 1;
+      continue;
+    }
+    break;
+  }
+  return end;
+}
+
+function findHeaderSection(entries, headerText) {
+  if (!headerText) return null;
+  return entries.find((entry) => (
+    entry.type === "header" &&
+    entry.text.toLowerCase() === headerText.toLowerCase()
+  )) || null;
+}
+
+function findSectionEnd(lines, entries, header) {
+  const nextHeader = entries.find((entry) => (
+    entry.type === "header" &&
+    entry.lineIndex > header.lineIndex &&
+    entry.level <= header.level
+  ));
+  return nextHeader ? nextHeader.lineIndex : lines.length;
+}
+
+function findSharedInsertIndex(content, { targetHeader, beforeMatchKey, position = "end" }) {
+  const lines = (content || "").replace(/\r\n?/g, "\n").split("\n");
+  const entries = parseStructuredOverview(content || "");
+
+  if (beforeMatchKey) {
+    const before = entries.find((entry) => entry.type === "item" && entry.matchKey === beforeMatchKey);
+    if (before) return before.lineIndex;
+  }
+
+  const header = findHeaderSection(entries, targetHeader);
+  if (!header) return lines.length;
+  if (position === "start") return header.lineIndex + 1;
+  return findSectionEnd(lines, entries, header);
+}
+
+function moveSharedBlockInContent(content, { matchKey, itemText, targetHeader, beforeMatchKey, position }) {
+  const lines = (content || "").replace(/\r\n?/g, "\n").split("\n");
+  const entries = parseStructuredOverview(content || "");
+  const found = entries.find((entry) => entry.type === "item" && itemMatches(entry, { matchKey, itemText }));
+  if (!found) throw new GitHubRepoError("Item niet gevonden", 404);
+
+  const end = findBlockEnd(lines, found.lineIndex);
+  const blockLines = lines.slice(found.lineIndex, end);
+  let insertIndex = findSharedInsertIndex(content, { targetHeader, beforeMatchKey, position });
+
+  lines.splice(found.lineIndex, end - found.lineIndex);
+  if (insertIndex > found.lineIndex) insertIndex -= end - found.lineIndex;
+  lines.splice(Math.max(0, insertIndex), 0, ...blockLines);
+  return lines.join("\n");
+}
+
+export async function markSharedOverviewDone(env, { matchKey, itemText, channel = "web" }) {
+  await updateWithRetry(
+    env,
+    SHARED_OVERVIEW_FILE,
+    (content) => {
+      const lines = (content || "").replace(/\r\n?/g, "\n").split("\n");
+      const entries = parseStructuredOverview(content || "");
+      const found = entries.find((entry) => entry.type === "item" && itemMatches(entry, { matchKey, itemText }));
+      if (!found) throw new GitHubRepoError("Item niet gevonden", 404);
+
+      const trimmed = lines[found.lineIndex].trim();
+      const prefix = lines[found.lineIndex].match(/^(\s*[-*]\s*)/)?.[1] || "- ";
+      lines[found.lineIndex] = `${prefix}~~${trimmed.slice(2)}~~ ✅ done`;
+      return lines.join("\n");
+    },
+    `assistant(${channel}): done shared "${(itemText || matchKey || "").slice(0, 50)}"`
+  );
+
+  return { ok: true, overview: await listSharedOverview(env, { noCache: true }) };
+}
+
+export async function organizeSharedOverviewItem(env, {
+  matchKey,
+  itemText,
+  targetHeader,
+  beforeMatchKey,
+  position = "end",
+  channel = "web",
+}) {
+  await updateWithRetry(
+    env,
+    SHARED_OVERVIEW_FILE,
+    (content) => moveSharedBlockInContent(content, {
+      matchKey,
+      itemText,
+      targetHeader,
+      beforeMatchKey,
+      position,
+    }),
+    `assistant(${channel}): organize shared`
+  );
+
+  return { ok: true, overview: await listSharedOverview(env, { noCache: true }) };
 }
 
 export async function addSpaceItem(env, { space, text, role, channel = "web" }) {

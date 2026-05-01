@@ -4,6 +4,8 @@ import {
   addSpaceItem,
   listSharedOverview,
   listSpaceItems,
+  markSharedOverviewDone,
+  organizeSharedOverviewItem,
   removeSpaceItem,
 } from "../lib/spaceService.js";
 
@@ -64,7 +66,41 @@ export async function onRequestPatch(context) {
   if (denied) return denied;
 
   try {
-    const { matchKey, parentItem, context: text } = await context.request.json();
+    const body = await context.request.json();
+    const {
+      action,
+      matchKey,
+      itemText,
+      parentItem,
+      context: text,
+      targetHeader,
+      beforeMatchKey,
+      position,
+    } = body;
+
+    if (action === "done") {
+      if (!matchKey && !itemText) {
+        return Response.json({ error: "matchKey/itemText is vereist" }, { status: 400 });
+      }
+      return Response.json(await markSharedOverviewDone(context.env, {
+        matchKey,
+        itemText,
+      }));
+    }
+
+    if (action === "organize") {
+      if (!matchKey && !itemText) {
+        return Response.json({ error: "matchKey/itemText is vereist" }, { status: 400 });
+      }
+      return Response.json(await organizeSharedOverviewItem(context.env, {
+        matchKey,
+        itemText,
+        targetHeader,
+        beforeMatchKey,
+        position,
+      }));
+    }
+
     if ((!matchKey && !parentItem) || !text || !text.trim()) {
       return Response.json({ error: "matchKey/parentItem en context zijn vereist" }, { status: 400 });
     }
