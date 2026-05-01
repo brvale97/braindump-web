@@ -227,6 +227,10 @@ export class SharedOverviewController {
 
   autoResizeInput() {
     if (!this.input) return;
+    if (!this.input.value.trim()) {
+      this.input.style.height = "";
+      return;
+    }
     this.input.style.height = "auto";
     this.input.style.height = `${Math.min(this.input.scrollHeight, 160)}px`;
   }
@@ -340,10 +344,13 @@ export class SharedOverviewController {
 
     for (const entry of entries) {
       if (entry.type === "header") {
-        lastHeaderLevel = entry.level || 2;
         lastHeaderText = entry.text;
+        lastHeaderLevel = entry.level || 2;
+        if (lastHeaderLevel >= 3) {
+          continue;
+        }
         const header = document.createElement("div");
-        header.className = `overview-header-item${lastHeaderLevel >= 3 ? " sub-header" : ""}`;
+        header.className = "overview-header-item";
         header.textContent = entry.text;
         header.dataset.category = category;
         header.dataset.section = entry.text;
@@ -352,7 +359,7 @@ export class SharedOverviewController {
       }
 
       const row = document.createElement("div");
-      row.className = `overview-item shared-overview-item${lastHeaderLevel >= 3 ? " sub-item" : ""}`;
+      row.className = "overview-item shared-overview-item";
       row.dataset.matchKey = entry.matchKey;
       row.dataset.category = category;
       row.dataset.section = lastHeaderText;

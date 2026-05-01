@@ -1479,15 +1479,16 @@ a:focus-visible {
 
   #tab-shared .composer {
     display: flex;
-    align-items: flex-end;
-    padding: 0.35rem 0.45rem 0.35rem 0;
+    align-items: center;
+    padding: 0.3rem 0.45rem 0.3rem 0;
   }
 
   #tab-shared .composer textarea {
     flex: 1;
-    min-height: 1.6em;
+    min-height: 44px;
     max-height: 7.5em;
     padding: 0.55rem 0.85rem;
+    line-height: 1.45;
   }
 
   #tab-shared .composer-actions {
@@ -1614,6 +1615,10 @@ a:focus-visible {
     align-self: flex-start;
     margin-left: auto;
     color: var(--text-muted);
+  }
+
+  .shared-overview-item .circle {
+    justify-content: flex-start;
   }
 
   .modal-overlay {
