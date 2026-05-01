@@ -36,7 +36,6 @@ test("bram flow shows personal tabs and overview data", async ({ page }) => {
     });
   });
   await page.route("**/api/shared", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) }));
-  await page.route("**/api/gep", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) }));
 
   await page.goto("/");
   await page.getByLabel("PIN invoeren").fill("1234");
@@ -44,6 +43,7 @@ test("bram flow shows personal tabs and overview data", async ({ page }) => {
 
   await expect(page.getByRole("button", { name: "Braindump" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Overzicht" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "GeP" })).toBeHidden();
   await page.getByRole("button", { name: "Overzicht" }).click();
   await expect(page.getByText("Refactor auth")).toBeVisible();
   await expect(page.getByPlaceholder("Zoek in overzicht")).toBeVisible();
@@ -147,7 +147,6 @@ test("personal inbox can add a new item", async ({ page }) => {
     });
   });
   await page.route("**/api/shared", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) }));
-  await page.route("**/api/gep", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) }));
 
   await page.goto("/");
   await page.getByLabel("PIN invoeren").fill("1234");
@@ -169,7 +168,6 @@ test("overview focus chips filter urgent, recent, and open items", async ({ page
   });
   await page.route("**/api/inbox**", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) }));
   await page.route("**/api/shared", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) }));
-  await page.route("**/api/gep", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) }));
   await page.route("**/api/overview", async (route) => {
     await route.fulfill({
       status: 200,

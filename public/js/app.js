@@ -55,14 +55,6 @@ const elements = {
     overviewSearchInput: document.getElementById("shared-overview-search"),
     categoryTabs: document.getElementById("shared-category-tabs"),
   },
-  gep: {
-    feed: document.getElementById("gep-feed"),
-    loading: document.getElementById("gep-loading"),
-    input: document.getElementById("gep-input"),
-    meta: document.getElementById("gep-meta"),
-    sendButton: document.getElementById("gep-send"),
-    refreshButton: document.getElementById("gep-refresh-btn"),
-  },
   overview: {
     meta: document.getElementById("overview-meta"),
     content: document.getElementById("overview-content"),
@@ -137,27 +129,6 @@ const sharedController = new FeedSpaceController({
     empty: "Gedeelde lijst is leeg",
     refreshed: "Gedeelde lijst ververst",
     sent: "Snel gedumpt naar gedeelde lijst",
-    contextAdded: "Context toegevoegd",
-  },
-});
-
-const gepController = new FeedSpaceController({
-  endpoint: "/api/gep",
-  feed: elements.gep.feed,
-  loading: elements.gep.loading,
-  input: elements.gep.input,
-  meta: elements.gep.meta,
-  refreshButton: elements.gep.refreshButton,
-  sendButton: elements.gep.sendButton,
-  editable: false,
-  lightbox: elements.lightbox,
-  initialDraft: state.drafts.gep,
-  onDraftChange: (value) => setDraft("gep", value),
-  onLoaded: (items) => setFeedData("gep", items),
-  messages: {
-    empty: "GeP inbox is leeg",
-    refreshed: "GeP ververst",
-    sent: "Snel gedumpt naar GeP",
     contextAdded: "Context toegevoegd",
   },
 });
@@ -247,13 +218,11 @@ async function showApp(role) {
 
   const inboxTab = document.querySelector('.tab[data-tab="inbox"]');
   const overviewTab = document.querySelector('.tab[data-tab="overview"]');
-  const gepTab = document.querySelector('.tab[data-tab="gep"]');
   const sharedTab = document.querySelector('.tab[data-tab="shared"]');
 
   if (role === "anna") {
     inboxTab.classList.add("hidden");
     overviewTab.classList.add("hidden");
-    gepTab.classList.add("hidden");
     sharedTab.classList.remove("hidden");
     setActiveTab("shared");
     await sharedController.load({ silent: true });
@@ -261,7 +230,6 @@ async function showApp(role) {
   } else {
     inboxTab.classList.remove("hidden");
     overviewTab.classList.remove("hidden");
-    gepTab.classList.remove("hidden");
     sharedTab.classList.remove("hidden");
     setActiveTab("inbox");
     if (Object.keys(state.overviewData).length > 0) overviewController.render();
@@ -299,7 +267,6 @@ async function refreshActiveTab(silent = false) {
   if (state.activeTab === "inbox" && state.role !== "anna") await personalController.load({ noCache: true, silent });
   if (state.activeTab === "overview" && state.role !== "anna") await overviewController.load({ silent });
   if (state.activeTab === "shared") await sharedController.load({ silent });
-  if (state.activeTab === "gep" && state.role !== "anna") await gepController.load({ silent });
 }
 
 async function refreshBackgroundTabs(silent = false) {
@@ -307,7 +274,6 @@ async function refreshBackgroundTabs(silent = false) {
   if (state.role !== "anna" && state.activeTab !== "inbox" && state.feedLoaded.personal) tasks.push(personalController.load({ noCache: true, silent }));
   if (state.role !== "anna" && state.activeTab !== "overview" && Object.keys(state.overviewData).length > 0) tasks.push(overviewController.load({ silent }));
   if (state.activeTab !== "shared" && state.feedLoaded.shared) tasks.push(sharedController.load({ silent }));
-  if (state.role !== "anna" && state.activeTab !== "gep" && state.feedLoaded.gep) tasks.push(gepController.load({ silent }));
   await Promise.allSettled(tasks);
 }
 
@@ -364,7 +330,6 @@ function bindTabs() {
       if (target === "inbox" && state.role !== "anna" && !state.feedLoaded.personal) await personalController.load();
       if (target === "shared" && !state.feedLoaded.shared) await sharedController.load();
       if (target === "shared" && state.feedLoaded.shared) sharedOverviewController.render();
-      if (target === "gep" && state.role !== "anna" && !state.feedLoaded.gep) await gepController.load();
       if (target === "shared") updateSharedNotification();
     });
   });
@@ -405,7 +370,6 @@ function bindCommon() {
   personalController.bind();
   sharedController.bind();
   sharedOverviewController.bind();
-  gepController.bind();
   overviewController.bind();
   settingsController.bind();
   uploadsController.bind();
@@ -418,7 +382,6 @@ function bindCommon() {
     await Promise.allSettled([
       personalController.load({ noCache: true }),
       overviewController.load(),
-      gepController.load({ silent: true }),
       sharedController.load({ silent: true }),
     ]);
   });
@@ -434,7 +397,6 @@ async function bootstrap() {
   bindCommon();
   if (state.drafts.personal) autoResize(elements.personal.input);
   if (state.drafts.shared) autoResize(elements.shared.input);
-  if (state.drafts.gep) autoResize(elements.gep.input);
 
   try {
     const session = await getSession();

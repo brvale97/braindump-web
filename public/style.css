@@ -608,8 +608,7 @@ a:focus-visible {
 }
 
 /* Send button (right side) */
-#inbox-send,
-#gep-send {
+#inbox-send {
   width: 44px;
   height: 44px;
   background: var(--accent);
@@ -624,13 +623,11 @@ a:focus-visible {
   transition: background 0.2s;
 }
 
-#inbox-send:hover:not(:disabled),
-#gep-send:hover:not(:disabled) {
+#inbox-send:hover:not(:disabled) {
   background: var(--accent-hover);
 }
 
-#inbox-send:disabled,
-#gep-send:disabled {
+#inbox-send:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
@@ -1420,7 +1417,7 @@ a:focus-visible {
     left: 0;
     z-index: 120;
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 0;
     padding: 0.25rem max(0.35rem, env(safe-area-inset-left)) calc(0.25rem + env(safe-area-inset-bottom)) max(0.35rem, env(safe-area-inset-right));
     border-top: 1px solid var(--border);

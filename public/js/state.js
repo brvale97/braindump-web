@@ -12,7 +12,6 @@ export const storageKeys = {
   sharedLastSeenTs: "braindump_shared_last_seen_ts_v2",
   personalDraft: "braindump_draft_personal",
   sharedDraft: "braindump_draft_shared",
-  gepDraft: "braindump_draft_gep",
 };
 
 function readJson(key, fallback) {
@@ -47,17 +46,14 @@ export const state = {
   feedData: {
     personal: [],
     shared: [],
-    gep: [],
   },
   drafts: {
     personal: localStorage.getItem(storageKeys.personalDraft) || "",
     shared: localStorage.getItem(storageKeys.sharedDraft) || "",
-    gep: localStorage.getItem(storageKeys.gepDraft) || "",
   },
   feedLoaded: {
     personal: false,
     shared: false,
-    gep: false,
   },
   pendingFiles: [],
   deferredInstallPrompt: null,
@@ -133,8 +129,8 @@ export function resetSessionState() {
   state.role = null;
   state.expiry = null;
   state.activeTab = "inbox";
-  state.feedData = { personal: [], shared: [], gep: [] };
-  state.feedLoaded = { personal: false, shared: false, gep: false };
+  state.feedData = { personal: [], shared: [] };
+  state.feedLoaded = { personal: false, shared: false };
   state.pendingFiles = [];
   clearOverviewCache();
 }
