@@ -12,6 +12,7 @@ import {
   appendInboxItem,
   deleteSpaceItem,
   editSpaceItem,
+  formatSortedTimestamp,
   getFile,
   updateWithRetry,
 } from "./githubRepo.js";
@@ -118,6 +119,42 @@ function moveSharedBlockInContent(content, { matchKey, itemText, targetHeader, b
   return lines.join("\n");
 }
 
+function findSectionInsertIndex(lines, entries, headerText) {
+  const header = findHeaderSection(entries, headerText);
+  if (!header) return null;
+  return findSectionEnd(lines, entries, header);
+}
+
+function ensureSharedSection(content, headerText) {
+  const lines = (content || "").replace(/\r\n?/g, "\n").split("\n");
+  const entries = parseStructuredOverview(content || "");
+  const existing = findHeaderSection(entries, headerText);
+  if (existing) return lines;
+
+  const trimmedEnd = lines.length > 0 && lines[lines.length - 1].trim() === "" ? lines.slice(0, -1) : lines;
+  return [...trimmedEnd, "", `## ${headerText}`, ""];
+}
+
+export async function addSharedOverviewItem(env, { text, channel = "web" }) {
+  const value = text.trim();
+  const line = `- [${formatSortedTimestamp()}] ${value}`;
+
+  await updateWithRetry(
+    env,
+    SHARED_OVERVIEW_FILE,
+    (content) => {
+      const lines = ensureSharedSection(content || "# Anna / Bram Overzicht\n", "Nog niet gesorteerd");
+      const entries = parseStructuredOverview(lines.join("\n"));
+      const insertAt = findSectionInsertIndex(lines, entries, "Nog niet gesorteerd") ?? lines.length;
+      lines.splice(insertAt, 0, line);
+      return lines.join("\n");
+    },
+    `assistant(${channel}): shared dump "${value.slice(0, 50)}"`
+  );
+
+  return { ok: true, overview: await listSharedOverview(env, { noCache: true }) };
+}
+
 export async function markSharedOverviewDone(env, { matchKey, itemText, channel = "web" }) {
   await updateWithRetry(
     env,
@@ -134,6 +171,28 @@ export async function markSharedOverviewDone(env, { matchKey, itemText, channel 
       return lines.join("\n");
     },
     `assistant(${channel}): done shared "${(itemText || matchKey || "").slice(0, 50)}"`
+  );
+
+  return { ok: true, overview: await listSharedOverview(env, { noCache: true }) };
+}
+
+export async function editSharedOverviewItem(env, { matchKey, itemText, newText, channel = "web" }) {
+  await updateWithRetry(
+    env,
+    SHARED_OVERVIEW_FILE,
+    (content) => {
+      const lines = (content || "").replace(/\r\n?/g, "\n").split("\n");
+      const entries = parseStructuredOverview(content || "");
+      const found = entries.find((entry) => entry.type === "item" && itemMatches(entry, { matchKey, itemText }));
+      if (!found) throw new GitHubRepoError("Item niet gevonden", 404);
+
+      const oldLine = lines[found.lineIndex];
+      const prefix = oldLine.match(/^(\s*[-*]\s*)/)?.[1] || "- ";
+      const datePrefix = found.timestamp ? `[${found.timestamp}] ` : "";
+      lines[found.lineIndex] = `${prefix}${datePrefix}${newText.trim()}`;
+      return lines.join("\n");
+    },
+    `assistant(${channel}): edit shared "${newText.trim().slice(0, 50)}"`
   );
 
   return { ok: true, overview: await listSharedOverview(env, { noCache: true }) };

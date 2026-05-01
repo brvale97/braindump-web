@@ -2,6 +2,8 @@ import { guardScope } from "../lib/access.js";
 import {
   addSpaceContext,
   addSpaceItem,
+  addSharedOverviewItem,
+  editSharedOverviewItem,
   listSharedOverview,
   listSpaceItems,
   markSharedOverviewDone,
@@ -32,9 +34,14 @@ export async function onRequestPost(context) {
   if (denied) return denied;
 
   try {
-    const { item } = await context.request.json();
+    const { item, target } = await context.request.json();
     if (!item || !item.trim()) {
       return Response.json({ error: "Item is vereist" }, { status: 400 });
+    }
+    if (target === "overview") {
+      return Response.json(await addSharedOverviewItem(context.env, {
+        text: item,
+      }));
     }
     return Response.json(await addSpaceItem(context.env, {
       space: SPACE,
@@ -73,6 +80,7 @@ export async function onRequestPatch(context) {
       itemText,
       parentItem,
       context: text,
+      newText,
       targetHeader,
       beforeMatchKey,
       position,
@@ -98,6 +106,17 @@ export async function onRequestPatch(context) {
         targetHeader,
         beforeMatchKey,
         position,
+      }));
+    }
+
+    if (action === "edit") {
+      if ((!matchKey && !itemText) || !newText || !newText.trim()) {
+        return Response.json({ error: "matchKey/itemText en newText zijn vereist" }, { status: 400 });
+      }
+      return Response.json(await editSharedOverviewItem(context.env, {
+        matchKey,
+        itemText,
+        newText,
       }));
     }
 

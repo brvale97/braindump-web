@@ -16,6 +16,7 @@ const categoryLabels = {
   tuin: "Tuin",
   afspraken: "Afspraken",
   boodschappen: "Boodschappen",
+  "nog-niet-gesorteerd": "Nog niet gesorteerd",
   later: "Later",
 };
 
@@ -31,6 +32,9 @@ const categoryAliases = new Map([
   ["persoonlijk", "afspraken"],
   ["boodschappen", "boodschappen"],
   ["kopen", "boodschappen"],
+  ["nog-niet-gesorteerd", "nog-niet-gesorteerd"],
+  ["nieuw", "nog-niet-gesorteerd"],
+  ["inbox", "nog-niet-gesorteerd"],
   ["later", "later"],
   ["someday", "later"],
   ["someday-misschien-later", "later"],
@@ -77,6 +81,7 @@ function groupedSharedEntries(entries) {
 
   for (const entry of entries || []) {
     if (entry.type === "header") {
+      if ((entry.level || 1) === 1) continue;
       const categoryKey = (entry.level || 2) <= 2 ? categoryKeyForHeader(entry.text) : null;
       if (categoryKey) {
         currentKey = categoryKey;
@@ -123,6 +128,9 @@ export class SharedOverviewController {
     this.elements = config;
     this.categories = [];
     this.dragState = null;
+    this.input = config.input;
+    this.sendButton = config.sendButton;
+    this.onDraftChange = config.onDraftChange || (() => {});
   }
 
   bind() {
@@ -150,6 +158,23 @@ export class SharedOverviewController {
       if (this.dragState) this.endDrag();
     });
     this.elements.content.addEventListener("pointercancel", () => this.cancelDrag());
+
+    if (this.input) {
+      this.input.placeholder = "Nieuw Anna/Bram item...";
+      this.input.addEventListener("input", () => {
+        this.onDraftChange(this.input.value);
+        this.autoResizeInput();
+      });
+      this.input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          this.submitCurrentInput();
+        }
+      });
+    }
+    if (this.sendButton) {
+      this.sendButton.addEventListener("click", () => this.submitCurrentInput());
+    }
   }
 
   updateSortButton() {
@@ -186,6 +211,12 @@ export class SharedOverviewController {
       });
       this.elements.categoryTabs.appendChild(button);
     }
+  }
+
+  autoResizeInput() {
+    if (!this.input) return;
+    this.input.style.height = "auto";
+    this.input.style.height = `${Math.min(this.input.scrollHeight, 160)}px`;
   }
 
   filteredEntries(entries) {
@@ -330,6 +361,7 @@ export class SharedOverviewController {
 
       const textWrap = document.createElement("div");
       textWrap.className = "item-text";
+      textWrap.title = "Klik om te bewerken";
       const main = document.createElement("span");
       main.className = "item-main";
       main.innerHTML = renderMarkdown(entry.text, toProxyUrl);
@@ -347,10 +379,99 @@ export class SharedOverviewController {
         contexts.appendChild(node);
       });
       textWrap.appendChild(contexts);
+      textWrap.addEventListener("click", (event) => {
+        if (event.target.closest("a, button, input, textarea, img")) return;
+        this.openEdit(entry, row);
+      });
 
       row.append(handle, circle, textWrap);
       card.appendChild(row);
     }
+  }
+
+  async submitCurrentInput() {
+    const text = this.input?.value.trim();
+    if (!text) return;
+    if (this.sendButton) this.sendButton.disabled = true;
+    if (this.input) this.input.disabled = true;
+    try {
+      const data = await apiFetch("/api/shared", {
+        method: "POST",
+        body: JSON.stringify({ target: "overview", item: text }),
+      });
+      setSharedOverviewData(data.overview || []);
+      if (this.input) {
+        this.input.value = "";
+        this.input.style.height = "";
+      }
+      this.onDraftChange("");
+      setActiveSharedCategory("nog-niet-gesorteerd");
+      this.render();
+    } catch (error) {
+      showToast(error.message || "Opslaan mislukt", "error");
+    } finally {
+      if (this.sendButton) this.sendButton.disabled = false;
+      if (this.input) {
+        this.input.disabled = false;
+        this.input.focus();
+      }
+    }
+  }
+
+  openEdit(entry, row) {
+    const existing = row.querySelector(".edit-input-wrap");
+    if (existing) {
+      existing.remove();
+      return;
+    }
+
+    const wrap = document.createElement("div");
+    wrap.className = "edit-input-wrap";
+    const textarea = document.createElement("textarea");
+    textarea.rows = 1;
+    textarea.value = entry.text;
+    const save = document.createElement("button");
+    save.type = "button";
+    save.textContent = "Opslaan";
+
+    const submit = async () => {
+      const value = textarea.value.trim();
+      if (!value || value === entry.text) {
+        wrap.remove();
+        return;
+      }
+      textarea.disabled = true;
+      save.disabled = true;
+      try {
+        const data = await apiFetch("/api/shared", {
+          method: "PATCH",
+          body: JSON.stringify({
+            action: "edit",
+            matchKey: entry.matchKey,
+            newText: value,
+          }),
+        });
+        setSharedOverviewData(data.overview || []);
+        this.render();
+      } catch (error) {
+        showToast(error.message || "Bewerken mislukt", "error");
+        textarea.disabled = false;
+        save.disabled = false;
+      }
+    };
+
+    textarea.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        submit();
+      }
+      if (event.key === "Escape") wrap.remove();
+    });
+    save.addEventListener("click", submit);
+
+    wrap.append(textarea, save);
+    row.querySelector(".item-text").appendChild(wrap);
+    textarea.focus();
   }
 
   async markDone(entry, row) {

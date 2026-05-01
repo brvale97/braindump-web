@@ -812,8 +812,7 @@ a:focus-visible {
 }
 
 #tab-shared .shared-list-header,
-#tab-shared .shared-inbox-feed,
-#tab-shared .chat-input {
+#tab-shared .shared-inbox-feed {
   display: none;
 }
 
@@ -1545,16 +1544,24 @@ a:focus-visible {
   .overview-item .circle {
     width: 44px;
     height: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    padding: 0;
     border-color: transparent;
     position: relative;
+    appearance: none;
+    -webkit-appearance: none;
   }
 
   .overview-item .circle::before {
     content: "";
     width: 20px;
     height: 20px;
+    min-width: 20px;
+    min-height: 20px;
     border: 2px solid var(--border);
     border-radius: 50%;
+    box-sizing: border-box;
   }
 
   .overview-item .circle:hover::before {

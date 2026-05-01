@@ -119,10 +119,10 @@ const sharedController = new FeedSpaceController({
   endpoint: "/api/shared",
   feed: elements.shared.feed,
   loading: elements.shared.loading,
-  input: elements.shared.input,
+  input: null,
   meta: elements.shared.meta,
   refreshButton: elements.shared.refreshButton,
-  sendButton: elements.shared.sendButton,
+  sendButton: null,
   editable: false,
   lightbox: elements.lightbox,
   initialDraft: state.drafts.shared,
@@ -173,6 +173,9 @@ const sharedOverviewController = new SharedOverviewController({
   sortButton: elements.shared.overviewSortButton,
   searchInput: elements.shared.overviewSearchInput,
   categoryTabs: elements.shared.categoryTabs,
+  input: elements.shared.input,
+  sendButton: elements.shared.sendButton,
+  onDraftChange: (value) => setDraft("shared", value),
 });
 
 const settingsController = new SettingsController({
