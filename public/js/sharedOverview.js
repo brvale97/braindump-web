@@ -148,7 +148,7 @@ export class SharedOverviewController {
     });
 
     this.elements.content.addEventListener("pointerdown", (event) => {
-      const handle = event.target.closest(".drag-handle");
+      const handle = event.target.closest(".drag-handle, .shared-drag-btn");
       if (handle) this.startDrag(event, handle);
     });
     this.elements.content.addEventListener("pointermove", (event) => {
@@ -384,7 +384,14 @@ export class SharedOverviewController {
         this.openEdit(entry, row);
       });
 
-      row.append(handle, circle, textWrap);
+      const more = document.createElement("button");
+      more.className = "more-btn shared-drag-btn";
+      more.type = "button";
+      more.innerHTML = "&#8942;";
+      more.title = "Sleep om te herschikken";
+      more.setAttribute("aria-label", `Sleep om te herschikken: ${entry.text}`);
+
+      row.append(handle, circle, textWrap, more);
       card.appendChild(row);
     }
   }
