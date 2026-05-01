@@ -128,6 +128,7 @@ export class SharedOverviewController {
     this.elements = config;
     this.categories = [];
     this.dragState = null;
+    this.pendingDrag = null;
     this.input = config.input;
     this.sendButton = config.sendButton;
     this.onDraftChange = config.onDraftChange || (() => {});
@@ -148,19 +149,30 @@ export class SharedOverviewController {
     });
 
     this.elements.content.addEventListener("pointerdown", (event) => {
-      const handle = event.target.closest(".drag-handle, .shared-drag-btn");
-      if (handle) this.startDrag(event, handle);
+      let handle = event.target.closest(".drag-handle, .shared-drag-btn");
+      const isTouch = event.pointerType === "touch" || event.pointerType === "pen";
+      if (!handle && isTouch && !event.target.closest("button, a, input, textarea, img")) {
+        handle = event.target.closest(".shared-overview-item");
+      }
+      if (handle) this.queueDrag(event, handle);
     });
     this.elements.content.addEventListener("pointermove", (event) => {
+      if (this.pendingDrag) this.updatePendingDrag(event);
       if (this.dragState) this.moveDrag(event);
     });
     this.elements.content.addEventListener("pointerup", () => {
+      this.cancelPendingDrag();
       if (this.dragState) this.endDrag();
     });
-    this.elements.content.addEventListener("pointercancel", () => this.cancelDrag());
+    this.elements.content.addEventListener("pointercancel", () => {
+      this.cancelPendingDrag();
+      this.cancelDrag();
+    });
 
     if (this.input) {
       this.input.placeholder = "Nieuw Anna/Bram item...";
+      this.input.rows = 1;
+      this.autoResizeInput();
       this.input.addEventListener("input", () => {
         this.onDraftChange(this.input.value);
         this.autoResizeInput();
@@ -498,6 +510,54 @@ export class SharedOverviewController {
       row.classList.remove("completed");
       showToast(error.message || "Afvinken mislukt", "error");
     }
+  }
+
+  queueDrag(event, handle) {
+    const row = handle.closest(".overview-item");
+    const card = row?.closest(".overview-card");
+    if (!row || !card || event.button !== 0 || state.sharedOverviewSortNewest || state.sharedOverviewQuery) {
+      return;
+    }
+
+    const isTouch = event.pointerType === "touch" || event.pointerType === "pen";
+    if (!isTouch) {
+      this.startDrag(event, handle);
+      return;
+    }
+
+    this.cancelPendingDrag();
+    this.pendingDrag = {
+      handle,
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      timer: window.setTimeout(() => {
+        const pending = this.pendingDrag;
+        this.pendingDrag = null;
+        this.startDrag({
+          button: 0,
+          clientX: pending.x,
+          clientY: pending.y,
+          pointerId: pending.pointerId,
+          preventDefault() {},
+        }, pending.handle);
+      }, isTouch ? 180 : 0),
+    };
+  }
+
+  updatePendingDrag(event) {
+    const pending = this.pendingDrag;
+    if (!pending || event.pointerId !== pending.pointerId) return;
+    const moved = Math.hypot(event.clientX - pending.x, event.clientY - pending.y);
+    if (moved > 9) {
+      this.cancelPendingDrag();
+    }
+  }
+
+  cancelPendingDrag() {
+    if (!this.pendingDrag) return;
+    window.clearTimeout(this.pendingDrag.timer);
+    this.pendingDrag = null;
   }
 
   startDrag(event, handle) {
