@@ -1,7 +1,9 @@
 import {
+  SHARED_OVERVIEW_FILE,
   SPACE_FILES,
   findFeedItem,
   parseFeedBlocks,
+  parseStructuredOverview,
   serializeFeedItem,
 } from "./braindumpParser.js";
 import {
@@ -22,6 +24,27 @@ export async function listSpaceItems(env, space, { noCache = false } = {}) {
   const file = await getFile(env, filePath, { tolerate404: true, noCache });
   const items = parseFeedBlocks(file?.content || "", { allowAuthor: allowAuthorForSpace(space) });
   return items.map(serializeFeedItem);
+}
+
+export async function listSharedOverview(env, { noCache = false } = {}) {
+  const file = await getFile(env, SHARED_OVERVIEW_FILE, { tolerate404: true, noCache });
+  return parseStructuredOverview(file?.content || "").map((entry) => {
+    if (entry.type === "header") {
+      return { type: "header", text: entry.text, level: entry.level };
+    }
+
+    return {
+      type: "item",
+      matchKey: entry.matchKey,
+      text: entry.text,
+      timestamp: entry.timestamp || null,
+      contexts: (entry.contexts || []).map((context) => ({
+        matchKey: context.matchKey,
+        text: context.text,
+        timestamp: context.timestamp || null,
+      })),
+    };
+  });
 }
 
 export async function addSpaceItem(env, { space, text, role, channel = "web" }) {

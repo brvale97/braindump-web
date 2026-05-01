@@ -26,9 +26,13 @@ function makeIconButton(className, icon, title, onClick) {
   return button;
 }
 
-function itemMatchesQuery(item, query) {
+function itemMatchesQueryWithSection(item, query, section) {
   if (!query) return true;
-  const haystack = [item.text, ...(item.contexts || []).map((context) => context.text)].join(" ").toLowerCase();
+  const haystack = [
+    section,
+    item.text,
+    ...(item.contexts || []).map((context) => context.text),
+  ].join(" ").toLowerCase();
   return haystack.includes(query.toLowerCase());
 }
 
@@ -37,6 +41,32 @@ function sortEntries(entries) {
   const onlyItems = entries.filter((entry) => entry.type !== "header");
   onlyItems.sort((left, right) => (right.timestamp || "").localeCompare(left.timestamp || ""));
   return onlyItems;
+}
+
+function itemsWithSection(category) {
+  const rows = [];
+  let section = "";
+  for (const entry of state.overviewData[category] || []) {
+    if (entry.type === "header") {
+      section = entry.text;
+      continue;
+    }
+    rows.push({ category, entry, section });
+  }
+  return rows;
+}
+
+function isUrgent(row) {
+  const text = `${row.section} ${row.entry.text}`.toLowerCase();
+  return text.includes("urgent") || text.includes("🔴");
+}
+
+function isRecent(row) {
+  const match = row.entry.timestamp?.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return false;
+  const itemDate = new Date(`${match[1]}-${match[2]}-${match[3]}T00:00:00`);
+  const ageMs = Date.now() - itemDate.getTime();
+  return ageMs >= 0 && ageMs <= 7 * 24 * 60 * 60 * 1000;
 }
 
 function reorderEntriesByMove(entries, matchKey, targetHeader, beforeMatchKey, position = "end") {
@@ -90,26 +120,32 @@ export class OverviewController {
   constructor(config) {
     this.elements = config;
     this.dragState = null;
+    this.focusMode = null;
   }
 
   bind() {
     this.elements.categoryTabs.forEach((tab) => {
       tab.addEventListener("click", () => {
+        this.focusMode = null;
         setActiveCategory(tab.dataset.cat);
         this.render();
       });
     });
 
     this.elements.sortButton.classList.toggle("active", state.sortNewest);
+    this.elements.sortButton.setAttribute("aria-label", state.sortNewest ? "Standaard volgorde" : "Sorteer op nieuwste");
     this.elements.sortButton.addEventListener("click", () => {
+      this.focusMode = null;
       setSortNewest(!state.sortNewest);
       this.elements.sortButton.classList.toggle("active", state.sortNewest);
       this.elements.sortButton.title = state.sortNewest ? "Standaard volgorde" : "Sorteer op nieuwste";
+      this.elements.sortButton.setAttribute("aria-label", state.sortNewest ? "Standaard volgorde" : "Sorteer op nieuwste");
       this.render();
     });
 
     this.elements.searchInput.value = state.overviewQuery;
     this.elements.searchInput.addEventListener("input", () => {
+      this.focusMode = null;
       setOverviewQuery(this.elements.searchInput.value.trim());
       this.render();
     });
@@ -145,7 +181,7 @@ export class OverviewController {
       setOverviewData(data.categories || {});
       this.elements.loading.classList.add("hidden");
       this.render();
-      if (!silent) this.setMeta("Overzicht ververst");
+      this.setMeta(silent ? "Bijgewerkt" : "Overzicht ververst");
     } catch (error) {
       if (Object.keys(state.overviewData).length === 0) {
         this.elements.loading.textContent = "Laden mislukt";
@@ -156,7 +192,7 @@ export class OverviewController {
 
   render() {
     this.elements.categoryTabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.cat === state.activeCategory));
-    this.elements.content.querySelectorAll(".overview-card, .empty, .zone-header").forEach((node) => node.remove());
+    this.elements.content.querySelectorAll(".focus-summary, .overview-card, .empty, .zone-header").forEach((node) => node.remove());
 
     if (state.activeCategory === "alles") {
       this.renderAllCategories();
@@ -182,13 +218,41 @@ export class OverviewController {
   filteredEntries(category) {
     const entries = state.overviewData[category] || [];
     const query = state.overviewQuery;
-    if (!query) return entries;
-    return entries.filter((entry) => entry.type === "header" || itemMatchesQuery(entry, query));
+    if (!query && !this.focusMode) return entries;
+
+    const filtered = [];
+    let pendingHeaders = [];
+    let currentSection = "";
+
+    for (const entry of entries) {
+      if (entry.type === "header") {
+        currentSection = entry.text;
+        pendingHeaders = (entry.level || 2) <= 2 ? [entry] : [...pendingHeaders, entry];
+        continue;
+      }
+
+      const row = { category, entry, section: currentSection };
+      const queryMatch = itemMatchesQueryWithSection(entry, query, currentSection);
+      const focusMatch = (
+        !this.focusMode ||
+        (this.focusMode === "urgent" && isUrgent(row)) ||
+        (this.focusMode === "recent" && isRecent(row))
+      );
+
+      if (queryMatch && focusMatch) {
+        filtered.push(...pendingHeaders, entry);
+        pendingHeaders = [];
+      }
+    }
+
+    return filtered;
   }
 
   renderAllCategories() {
+    this.renderFocusSummary();
+
     const zones = [
-      { key: "claude", title: "Claude Code kan oppakken", categories: ["code"] },
+      { key: "claude", title: "Codex kan dit oppakken", categories: ["code"] },
       { key: "jij", title: "Jij zelf", categories: ["werk", "fysiek", "persoonlijk", "someday"] },
     ];
 
@@ -225,6 +289,58 @@ export class OverviewController {
     }
   }
 
+  renderFocusSummary() {
+    const rows = ["werk", "fysiek", "code", "persoonlijk", "someday"].flatMap((category) => itemsWithSection(category));
+    const urgent = rows.filter(isUrgent).length;
+    const recent = rows.filter(isRecent).length;
+    const total = rows.length;
+
+    const summary = document.createElement("div");
+    summary.className = "focus-summary";
+    summary.innerHTML = `
+      <button type="button" class="focus-chip focus-chip-urgent${this.focusMode === "urgent" ? " active" : ""}" data-filter="urgent">
+        <span class="focus-value">${urgent}</span>
+        <span class="focus-label">urgent</span>
+      </button>
+      <button type="button" class="focus-chip focus-chip-recent${this.focusMode === "recent" ? " active" : ""}" data-filter="recent">
+        <span class="focus-value">${recent}</span>
+        <span class="focus-label">recent</span>
+      </button>
+      <button type="button" class="focus-chip focus-chip-all${!this.focusMode && !state.overviewQuery ? " active" : ""}" data-filter="open">
+        <span class="focus-value">${total}</span>
+        <span class="focus-label">open</span>
+      </button>
+    `;
+    summary.querySelector(".focus-chip-urgent").addEventListener("click", () => {
+      this.focusMode = this.focusMode === "urgent" ? null : "urgent";
+      setOverviewQuery("");
+      this.elements.searchInput.value = "";
+      setActiveCategory("alles");
+      this.render();
+    });
+    summary.querySelector(".focus-chip-recent").addEventListener("click", () => {
+      this.focusMode = this.focusMode === "recent" ? null : "recent";
+      setOverviewQuery("");
+      this.elements.searchInput.value = "";
+      setSortNewest(true);
+      this.elements.sortButton.classList.add("active");
+      this.elements.sortButton.title = "Standaard volgorde";
+      this.elements.sortButton.setAttribute("aria-label", "Standaard volgorde");
+      this.render();
+    });
+    summary.querySelector(".focus-chip-all").addEventListener("click", () => {
+      this.focusMode = null;
+      setOverviewQuery("");
+      this.elements.searchInput.value = "";
+      setSortNewest(false);
+      this.elements.sortButton.classList.remove("active");
+      this.elements.sortButton.title = "Sorteer op nieuwste";
+      this.elements.sortButton.setAttribute("aria-label", "Sorteer op nieuwste");
+      this.render();
+    });
+    this.elements.content.appendChild(summary);
+  }
+
   renderItemsIntoCard(card, entries, category) {
     let lastHeaderLevel = 1;
     let lastHeaderText = "";
@@ -254,9 +370,11 @@ export class OverviewController {
         handle.classList.add("hidden");
       }
 
-      const circle = document.createElement("div");
+      const circle = document.createElement("button");
       circle.className = "circle";
+      circle.type = "button";
       circle.title = "Markeer als klaar";
+      circle.setAttribute("aria-label", `Markeer als klaar: ${entry.text}`);
       circle.addEventListener("click", () => this.markDone(category, entry, row));
 
       const textWrap = document.createElement("div");

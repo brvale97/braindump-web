@@ -70,8 +70,8 @@ export class FeedSpaceController {
       const data = await apiFetch(`${this.config.endpoint}${suffix}`);
       this.items = data.items || [];
       this.render();
-      this.onLoaded(this.items);
-      if (!silent) this.setMeta(this.config.messages.refreshed);
+      this.onLoaded(this.items, data);
+      this.setMeta(silent ? "Bijgewerkt" : this.config.messages.refreshed);
       if (this.loading) this.loading.classList.add("hidden");
       return this.items;
     } catch (error) {
@@ -175,18 +175,22 @@ export class FeedSpaceController {
 
     const actions = document.createElement("div");
     actions.className = "inbox-item-actions";
-    actions.appendChild(makeButton("context-btn", contextSvg, "Context toevoegen", () => this.openContextEditor(item, element)));
-    if (this.config.editable) {
+    if (!item.readOnly) {
+      actions.appendChild(makeButton("context-btn", contextSvg, "Context toevoegen", () => this.openContextEditor(item, element)));
+    }
+    if (this.config.editable && !item.readOnly) {
       actions.appendChild(makeButton("edit-btn", editSvg, "Bewerken", () => this.openEditEditor(item, element)));
     }
     actions.appendChild(makeButton("copy-btn", copySvg, "Kopiëren", () => {
       navigator.clipboard.writeText(item.text);
       showToast("Gekopieerd");
     }));
-    actions.appendChild(makeButton("delete-btn", deleteSvg, "Verwijderen", async () => {
-      if (!(await confirmDialog("Dit item verwijderen?"))) return;
-      await this.deleteItem(item.matchKey);
-    }));
+    if (!item.readOnly) {
+      actions.appendChild(makeButton("delete-btn", deleteSvg, "Verwijderen", async () => {
+        if (!(await confirmDialog("Dit item verwijderen?"))) return;
+        await this.deleteItem(item.matchKey);
+      }));
+    }
 
     element.appendChild(content);
     element.appendChild(actions);
@@ -228,6 +232,7 @@ export class FeedSpaceController {
       }
       this.input.value = "";
       this.onDraftChange("");
+      this.input.style.height = "";
       this.setMeta(this.config.messages.sent);
     } catch (error) {
       showToast(error.message || "Opslaan mislukt", "error");

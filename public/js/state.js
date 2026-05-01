@@ -1,8 +1,12 @@
 export const storageKeys = {
   activeCategory: "braindump_active_category",
+  activeSharedCategory: "braindump_active_shared_category",
   sortNewest: "braindump_sort_newest",
   overviewQuery: "braindump_overview_query",
   overviewCache: "braindump_overview_cache_v2",
+  sharedOverviewQuery: "braindump_shared_overview_query",
+  sharedOverviewSortNewest: "braindump_shared_overview_sort_newest",
+  sharedOverviewCache: "braindump_shared_overview_cache_v1",
   installDismissed: "braindump_install_dismissed",
   sharedLastVisited: "braindump_shared_last_visited_v2",
   sharedLastSeenTs: "braindump_shared_last_seen_ts_v2",
@@ -33,9 +37,13 @@ export const state = {
   expiry: null,
   activeTab: "inbox",
   activeCategory: localStorage.getItem(storageKeys.activeCategory) || "alles",
+  activeSharedCategory: localStorage.getItem(storageKeys.activeSharedCategory) || "alles",
   sortNewest: localStorage.getItem(storageKeys.sortNewest) === "1",
   overviewQuery: localStorage.getItem(storageKeys.overviewQuery) || "",
   overviewData: readJson(storageKeys.overviewCache, {}),
+  sharedOverviewQuery: localStorage.getItem(storageKeys.sharedOverviewQuery) || "",
+  sharedOverviewSortNewest: localStorage.getItem(storageKeys.sharedOverviewSortNewest) === "1",
+  sharedOverviewData: readJson(storageKeys.sharedOverviewCache, []),
   feedData: {
     personal: [],
     shared: [],
@@ -68,6 +76,11 @@ export function setActiveCategory(value) {
   localStorage.setItem(storageKeys.activeCategory, value);
 }
 
+export function setActiveSharedCategory(value) {
+  state.activeSharedCategory = value;
+  localStorage.setItem(storageKeys.activeSharedCategory, value);
+}
+
 export function setSortNewest(value) {
   state.sortNewest = value;
   localStorage.setItem(storageKeys.sortNewest, value ? "1" : "0");
@@ -83,9 +96,26 @@ export function setOverviewData(data) {
   writeJson(storageKeys.overviewCache, data);
 }
 
+export function setSharedOverviewQuery(value) {
+  state.sharedOverviewQuery = value;
+  localStorage.setItem(storageKeys.sharedOverviewQuery, value);
+}
+
+export function setSharedOverviewSortNewest(value) {
+  state.sharedOverviewSortNewest = value;
+  localStorage.setItem(storageKeys.sharedOverviewSortNewest, value ? "1" : "0");
+}
+
+export function setSharedOverviewData(data) {
+  state.sharedOverviewData = data;
+  writeJson(storageKeys.sharedOverviewCache, data);
+}
+
 export function clearOverviewCache() {
   state.overviewData = {};
+  state.sharedOverviewData = [];
   localStorage.removeItem(storageKeys.overviewCache);
+  localStorage.removeItem(storageKeys.sharedOverviewCache);
 }
 
 export function setFeedData(space, items) {

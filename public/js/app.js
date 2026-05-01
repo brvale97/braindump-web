@@ -5,12 +5,14 @@ import {
   setExpiry,
   setFeedData,
   setRole,
+  setSharedOverviewData,
   state,
   storageKeys,
 } from "./state.js";
 import { autoResize, initLightbox, showToast } from "./ui.js";
 import { FeedSpaceController } from "./feedSpace.js";
 import { OverviewController } from "./overview.js";
+import { SharedOverviewController } from "./sharedOverview.js";
 import { UploadsController } from "./uploads.js";
 import { SettingsController } from "./settings.js";
 import { initPwa } from "./pwa.js";
@@ -47,6 +49,11 @@ const elements = {
     sendButton: document.getElementById("shared-send"),
     refreshButton: document.getElementById("shared-refresh-btn"),
     tab: document.querySelector('.tab[data-tab="shared"]'),
+    overviewContent: document.getElementById("shared-overview-content"),
+    overviewLoading: document.getElementById("shared-overview-loading"),
+    overviewSortButton: document.getElementById("shared-sort-btn"),
+    overviewSearchInput: document.getElementById("shared-overview-search"),
+    categoryTabs: document.getElementById("shared-category-tabs"),
   },
   gep: {
     feed: document.getElementById("gep-feed"),
@@ -120,8 +127,10 @@ const sharedController = new FeedSpaceController({
   lightbox: elements.lightbox,
   initialDraft: state.drafts.shared,
   onDraftChange: (value) => setDraft("shared", value),
-  onLoaded: (items) => {
+  onLoaded: (items, data) => {
     setFeedData("shared", items);
+    setSharedOverviewData(data.overview || []);
+    sharedOverviewController.render();
     updateSharedNotification(items);
   },
   messages: {
@@ -156,6 +165,14 @@ const gepController = new FeedSpaceController({
 const overviewController = new OverviewController({
   ...elements.overview,
   lightbox: elements.lightbox,
+});
+
+const sharedOverviewController = new SharedOverviewController({
+  content: elements.shared.overviewContent,
+  loading: elements.shared.overviewLoading,
+  sortButton: elements.shared.overviewSortButton,
+  searchInput: elements.shared.overviewSearchInput,
+  categoryTabs: elements.shared.categoryTabs,
 });
 
 const settingsController = new SettingsController({
@@ -201,7 +218,11 @@ function updateSharedNotification(items = state.feedData.shared) {
 
 function setActiveTab(tab) {
   state.activeTab = tab;
-  elements.tabs.forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
+  elements.tabs.forEach((button) => {
+    const active = button.dataset.tab === tab;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  });
   elements.tabContents.forEach((node) => node.classList.add("hidden"));
   document.getElementById(`tab-${tab}`).classList.remove("hidden");
   if (tab === "shared") updateSharedNotification();
@@ -233,6 +254,7 @@ async function showApp(role) {
     sharedTab.classList.remove("hidden");
     setActiveTab("shared");
     await sharedController.load({ silent: true });
+    elements.shared.input.focus();
   } else {
     inboxTab.classList.remove("hidden");
     overviewTab.classList.remove("hidden");
@@ -240,10 +262,12 @@ async function showApp(role) {
     sharedTab.classList.remove("hidden");
     setActiveTab("inbox");
     if (Object.keys(state.overviewData).length > 0) overviewController.render();
+    if (state.sharedOverviewData.length > 0) sharedOverviewController.render();
     await Promise.allSettled([
       personalController.load({ silent: true }),
       overviewController.load({ silent: true }),
     ]);
+    elements.personal.input.focus();
   }
 
   startPolling();
@@ -336,6 +360,7 @@ function bindTabs() {
       }
       if (target === "inbox" && state.role !== "anna" && !state.feedLoaded.personal) await personalController.load();
       if (target === "shared" && !state.feedLoaded.shared) await sharedController.load();
+      if (target === "shared" && state.feedLoaded.shared) sharedOverviewController.render();
       if (target === "gep" && state.role !== "anna" && !state.feedLoaded.gep) await gepController.load();
       if (target === "shared") updateSharedNotification();
     });
@@ -376,6 +401,7 @@ function bindPersonalComposer() {
 function bindCommon() {
   personalController.bind();
   sharedController.bind();
+  sharedOverviewController.bind();
   gepController.bind();
   overviewController.bind();
   settingsController.bind();

@@ -12,6 +12,8 @@ export const SORTED_FILES = {
   someday: "sorted/someday.md",
 };
 
+export const SHARED_OVERVIEW_FILE = "sorted/anna-bram-overzicht.md";
+
 export const CATEGORY_LABELS = {
   werk: "Werk",
   fysiek: "Fysiek",

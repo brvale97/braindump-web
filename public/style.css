@@ -57,6 +57,14 @@ a:focus-visible {
   height: 100%;
 }
 
+#app-screen .container:has(#tab-overview:not(.hidden)) {
+  max-width: 1040px;
+}
+
+#app-screen .container:has(#tab-shared:not(.hidden)) {
+  max-width: 900px;
+}
+
 /* Login */
 .login-box {
   margin: auto;
@@ -134,6 +142,7 @@ a:focus-visible {
   top: 0;
   z-index: 10;
   background: var(--bg);
+  align-items: center;
 }
 
 .tab {
@@ -145,6 +154,7 @@ a:focus-visible {
   cursor: pointer;
   font-weight: 500;
   border-bottom: 2px solid transparent;
+  min-height: 44px;
   transition: color 0.2s, border-color 0.2s;
 }
 
@@ -529,7 +539,7 @@ a:focus-visible {
 .composer {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 8px;
   overflow: hidden;
   transition: border-color 0.2s;
 }
@@ -573,8 +583,8 @@ a:focus-visible {
 
 /* Attach button (+ icon, left side) */
 .attach-btn {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   background: none;
   color: var(--text-muted);
   border: none;
@@ -598,9 +608,10 @@ a:focus-visible {
 }
 
 /* Send button (right side) */
-#inbox-send {
-  width: 36px;
-  height: 36px;
+#inbox-send,
+#gep-send {
+  width: 44px;
+  height: 44px;
   background: var(--accent);
   color: white;
   border: none;
@@ -613,11 +624,13 @@ a:focus-visible {
   transition: background 0.2s;
 }
 
-#inbox-send:hover:not(:disabled) {
+#inbox-send:hover:not(:disabled),
+#gep-send:hover:not(:disabled) {
   background: var(--accent-hover);
 }
 
-#inbox-send:disabled {
+#inbox-send:disabled,
+#gep-send:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
@@ -692,6 +705,8 @@ a:focus-visible {
   color: var(--text-muted);
   padding: 0.4rem;
   border-radius: 8px;
+  min-width: 44px;
+  min-height: 44px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -733,7 +748,7 @@ a:focus-visible {
 }
 
 .cat-tab {
-  padding: 0.35rem 0.75rem;
+  padding: 0.45rem 0.8rem;
   font-size: 0.8rem;
   background: transparent;
   border: 1px solid var(--border);
@@ -742,6 +757,7 @@ a:focus-visible {
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
+  min-height: 36px;
   transition: all 0.2s;
   font-weight: 500;
 }
@@ -766,12 +782,94 @@ a:focus-visible {
   gap: 1rem;
 }
 
+.shared-overview-header {
+  padding-top: 0.5rem;
+}
+
+.shared-overview-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-bottom: 1rem;
+}
+
+.shared-overview-card {
+  padding-top: 0.25rem;
+}
+
+.shared-overview-item {
+  padding-left: 1.25rem;
+}
+
+.shared-readonly-circle {
+  cursor: default;
+  pointer-events: none;
+}
+
+.shared-inbox-feed {
+  flex: 0 0 auto;
+  max-height: 30vh;
+  padding-top: 0.25rem;
+}
+
+#tab-shared .shared-list-header,
+#tab-shared .shared-inbox-feed,
+#tab-shared .chat-input {
+  display: none;
+}
+
 /* Google Tasks style cards */
 .overview-card {
   background: var(--surface);
-  border-radius: 16px;
+  border-radius: 8px;
   border: 1px solid var(--border);
   padding: 0.5rem 0;
+}
+
+.focus-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.focus-chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 52px;
+  padding: 0.65rem 0.85rem;
+  text-align: left;
+}
+
+.focus-chip:hover {
+  border-color: var(--accent);
+}
+
+.focus-chip.active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.focus-chip-urgent .focus-value {
+  color: var(--danger);
+}
+
+.focus-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.focus-label {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 /* --- Zones op de "Alles"-tab: Claude Code vs Jij zelf --- */
@@ -856,6 +954,7 @@ a:focus-visible {
   min-width: 20px;
   border: 2px solid var(--border);
   border-radius: 50%;
+  background: transparent;
   flex-shrink: 0;
   margin-top: 2px;
   cursor: pointer;
@@ -905,7 +1004,7 @@ a:focus-visible {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 0.3rem;
+  padding: 0.45rem;
   border-radius: 6px;
   opacity: 0;
   transition: opacity 0.2s, color 0.2s;
@@ -936,7 +1035,7 @@ a:focus-visible {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 0.3rem;
+  padding: 0.45rem;
   border-radius: 6px;
   opacity: 0;
   transition: opacity 0.2s, color 0.2s;
@@ -1001,7 +1100,7 @@ a:focus-visible {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 0.3rem;
+  padding: 0.45rem;
   border-radius: 6px;
   opacity: 0;
   transition: opacity 0.2s, color 0.2s;
@@ -1068,7 +1167,7 @@ a:focus-visible {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 0.3rem;
+  padding: 0.45rem;
   border-radius: 6px;
   flex-shrink: 0;
   font-size: 1.1rem;
@@ -1110,6 +1209,8 @@ a:focus-visible {
   .item-actions.open .move-btn,
   .item-actions.open .copy-btn {
     opacity: 1;
+    min-width: 44px;
+    min-height: 44px;
   }
 
   /* Inbox action buttons stay visible */
@@ -1295,6 +1396,114 @@ a:focus-visible {
 
 /* Mobile compact layout */
 @media (max-width: 600px) {
+  body {
+    font-size: 15px;
+  }
+
+  #app-screen .container,
+  #app-screen .container:has(#tab-overview:not(.hidden)),
+  #app-screen .container:has(#tab-shared:not(.hidden)) {
+    max-width: none;
+  }
+
+  .tabs {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 120;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0;
+    padding: 0.25rem max(0.35rem, env(safe-area-inset-left)) calc(0.25rem + env(safe-area-inset-bottom)) max(0.35rem, env(safe-area-inset-right));
+    border-top: 1px solid var(--border);
+  }
+
+  .tab {
+    min-width: 0;
+    min-height: 52px;
+    padding: 0.45rem 0.15rem;
+    font-size: 0;
+    border-bottom: none;
+    border-top: 2px solid transparent;
+  }
+
+  .tab::after {
+    content: attr(data-short);
+    font-size: 0.78rem;
+    line-height: 1.1;
+  }
+
+  .tab.active {
+    border-bottom-color: transparent;
+    border-top-color: var(--accent);
+  }
+
+  .settings-btn {
+    margin-left: 0;
+    min-width: 0;
+    min-height: 52px;
+    padding: 0.35rem;
+    border-radius: 8px;
+  }
+
+  .tab-content {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+
+  .inbox-header {
+    align-items: center;
+    padding-top: 0.25rem;
+  }
+
+  .header-meta {
+    font-size: 0.76rem;
+  }
+
+  .inbox-feed {
+    padding: 0.75rem;
+  }
+
+  .chat-input {
+    padding: 0.55rem 0.75rem;
+  }
+
+  .composer textarea {
+    font-size: 1rem;
+    min-height: 2.4em;
+  }
+
+  .overview-header {
+    padding: 0.5rem 0.75rem 0.25rem;
+    gap: 0.4rem;
+  }
+
+  .overview-search {
+    font-size: 1rem;
+  }
+
+  .focus-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.4rem;
+  }
+
+  .focus-chip {
+    min-height: 48px;
+    padding: 0.55rem 0.6rem;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .focus-value {
+    font-size: 1.05rem;
+  }
+
+  .focus-label {
+    font-size: 0.68rem;
+  }
+
   .overview-item {
     padding: 0.5rem 0.75rem;
     gap: 0.5rem;
@@ -1306,8 +1515,17 @@ a:focus-visible {
     gap: 0.75rem;
   }
 
+  .shared-overview-content {
+    padding-bottom: 0.75rem;
+  }
+
+  .shared-inbox-feed {
+    max-height: 28vh;
+    padding: 0.5rem 0.75rem;
+  }
+
   .overview-card {
-    border-radius: 12px;
+    border-radius: 8px;
   }
 
   .overview-card-title {
@@ -1316,6 +1534,50 @@ a:focus-visible {
 
   .overview-header-item {
     padding: 0.4rem 0.75rem 0.1rem;
+  }
+
+  .more-btn,
+  .overview-item .circle {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .overview-item .circle {
+    width: 44px;
+    height: 44px;
+    border-color: transparent;
+    position: relative;
+  }
+
+  .overview-item .circle::before {
+    content: "";
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-radius: 50%;
+  }
+
+  .overview-item .circle:hover::before {
+    border-color: var(--accent);
+  }
+
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0.75rem;
+    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  }
+
+  .modal {
+    max-width: none;
+  }
+
+  .settings-key-row {
+    flex-wrap: wrap;
+  }
+
+  .settings-key-row input,
+  .settings-save-btn {
+    min-height: 44px;
   }
 }
 
@@ -1346,6 +1608,8 @@ a:focus-visible {
   cursor: pointer;
   padding: 0.4rem;
   border-radius: 8px;
+  min-width: 44px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1355,6 +1619,10 @@ a:focus-visible {
 .settings-btn:hover {
   color: var(--text);
   background: var(--surface2);
+}
+
+.settings-btn + .settings-btn {
+  margin-left: 0;
 }
 
 /* Settings modal */
@@ -1371,7 +1639,7 @@ a:focus-visible {
 
 .modal {
   background: var(--surface);
-  border-radius: 16px;
+  border-radius: 8px;
   width: 100%;
   max-width: 420px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
@@ -1488,7 +1756,7 @@ a:focus-visible {
   width: min(100%, 420px);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: 8px;
   padding: 1.1rem;
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
 }
@@ -1526,8 +1794,8 @@ a:focus-visible {
 
 /* Mic button */
 .mic-btn {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   background: none;
   color: var(--text-muted);
   border: none;
@@ -1603,8 +1871,8 @@ a:focus-visible {
 
 /* Shared tab send button (same as inbox send) */
 #shared-send {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   background: var(--accent);
   color: white;
   border: none;

@@ -2,6 +2,7 @@ import { guardScope } from "../lib/access.js";
 import {
   addSpaceContext,
   addSpaceItem,
+  listSharedOverview,
   listSpaceItems,
   removeSpaceItem,
 } from "../lib/spaceService.js";
@@ -13,7 +14,12 @@ export async function onRequestGet(context) {
   if (denied) return denied;
 
   try {
-    return Response.json({ items: await listSpaceItems(context.env, SPACE) });
+    const noCache = new URL(context.request.url).searchParams.has("nocache");
+    const [items, overview] = await Promise.all([
+      listSpaceItems(context.env, SPACE, { noCache }),
+      listSharedOverview(context.env, { noCache }),
+    ]);
+    return Response.json({ items, overview });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }

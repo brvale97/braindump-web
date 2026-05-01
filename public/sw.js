@@ -1,4 +1,4 @@
-const CACHE_NAME = "braindump-shell-v2";
+const CACHE_NAME = "braindump-shell-v5";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -11,6 +11,7 @@ const APP_SHELL = [
   "/js/ui.js",
   "/js/feedSpace.js",
   "/js/overview.js",
+  "/js/sharedOverview.js",
   "/js/uploads.js",
   "/js/settings.js",
   "/js/pwa.js",

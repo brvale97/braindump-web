@@ -29,10 +29,10 @@
     <div class="container">
       <!-- Tab navigation -->
       <nav class="tabs">
-        <button class="tab active" data-tab="inbox">Braindump</button>
-        <button class="tab" data-tab="overview">Overzicht</button>
-        <button class="tab" data-tab="gep">GeP</button>
-        <button class="tab" data-tab="shared">Anna / Bram</button>
+        <button class="tab active" data-tab="inbox" data-short="Dump">Braindump</button>
+        <button class="tab" data-tab="overview" data-short="Taken">Overzicht</button>
+        <button class="tab" data-tab="gep" data-short="GeP">GeP</button>
+        <button class="tab" data-tab="shared" data-short="Samen">Anna / Bram</button>
         <button id="settings-btn" class="settings-btn" type="button" title="Instellingen" aria-label="Instellingen">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
@@ -85,7 +85,7 @@
             <button class="cat-tab" data-cat="someday">Someday</button>
           </div>
           <input id="overview-search" class="overview-search" type="search" placeholder="Zoek in overzicht" aria-label="Zoek in overzicht">
-          <button id="sort-btn" class="refresh-btn" title="Sorteer op nieuwste">
+          <button id="sort-btn" class="refresh-btn" type="button" title="Sorteer op nieuwste" aria-label="Sorteer op nieuwste">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
           </button>
           <button id="refresh-btn" class="refresh-btn" type="button" title="Ververs" aria-label="Ververs overzicht">
@@ -126,13 +126,23 @@
 
       <!-- Shared tab -->
       <div id="tab-shared" class="tab-content hidden">
-        <div class="inbox-header">
-          <div class="header-meta" id="shared-meta">Nog niet ververst</div>
+        <div class="overview-header shared-overview-header">
+          <div class="category-tabs" id="shared-category-tabs"></div>
+          <input id="shared-overview-search" class="overview-search" type="search" placeholder="Zoek in Anna/Bram" aria-label="Zoek in Anna/Bram overzicht">
+          <button id="shared-sort-btn" class="refresh-btn" type="button" title="Sorteer op nieuwste" aria-label="Sorteer gedeeld overzicht op nieuwste">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+          </button>
+        </div>
+        <div class="header-meta page-meta" id="shared-meta">Nog niet ververst</div>
+        <div class="overview-content shared-overview-content" id="shared-overview-content">
+          <div class="loading" id="shared-overview-loading">Laden...</div>
+        </div>
+        <div class="inbox-header shared-list-header">
           <button id="shared-refresh-btn" class="refresh-btn" type="button" title="Ververs gedeelde lijst" aria-label="Ververs gedeelde lijst">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
           </button>
         </div>
-        <div class="inbox-feed" id="shared-feed">
+        <div class="inbox-feed shared-inbox-feed" id="shared-feed">
           <div class="loading" id="shared-loading">Laden...</div>
         </div>
         <div class="chat-input">
