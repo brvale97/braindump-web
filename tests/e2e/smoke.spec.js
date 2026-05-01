@@ -91,7 +91,7 @@ test("anna flow only exposes shared tab", async ({ page }) => {
 
   await expect(page.getByRole("button", { name: "Anna / Bram" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Braindump" })).toBeHidden();
-  await expect(page.getByPlaceholder("Zoek in Anna/Bram")).toBeVisible();
+  await expect(page.getByPlaceholder("Zoek in Anna/Bram")).toBeHidden();
   await expect(page.getByText("Tuintafel schoonmaken")).toBeVisible();
   await expect(page.getByRole("button", { name: "Alles" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Huis", exact: true })).toBeVisible();

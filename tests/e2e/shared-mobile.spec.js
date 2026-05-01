@@ -53,6 +53,8 @@ test.describe("Anna/Bram mobile overview", () => {
     const dragButton = row.locator(".shared-drag-btn");
     await expect(row).toBeVisible();
     await expect(dragButton).toBeVisible();
+    await expect(page.getByPlaceholder("Zoek in Anna/Bram")).toBeHidden();
+    await expect(page.locator(".focus-summary")).toBeHidden();
     await expect(page.locator(".overview-header-item", { hasText: "Urgent" })).toBeHidden();
     await expect(page.locator(".overview-header-item", { hasText: "Binnenkort" })).toBeHidden();
 

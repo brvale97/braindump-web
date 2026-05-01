@@ -97,32 +97,6 @@ function groupedSharedEntries(entries) {
   return Object.values(categories);
 }
 
-function itemsWithSection(category) {
-  const rows = [];
-  let section = "";
-  for (const entry of category.entries || []) {
-    if (entry.type === "header") {
-      section = entry.text;
-      continue;
-    }
-    rows.push({ category: category.key, entry, section });
-  }
-  return rows;
-}
-
-function isUrgent(row) {
-  const text = `${row.section} ${row.entry.text}`.toLowerCase();
-  return text.includes("urgent") || text.includes("🔴");
-}
-
-function isRecent(row) {
-  const match = row.entry.timestamp?.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!match) return false;
-  const itemDate = new Date(`${match[1]}-${match[2]}-${match[3]}T00:00:00`);
-  const ageMs = Date.now() - itemDate.getTime();
-  return ageMs >= 0 && ageMs <= 7 * 24 * 60 * 60 * 1000;
-}
-
 export class SharedOverviewController {
   constructor(config) {
     this.elements = config;
@@ -285,7 +259,6 @@ export class SharedOverviewController {
   }
 
   renderAllCategories() {
-    this.renderFocusSummary();
     let hasItems = false;
     for (const category of this.categories) {
       const entries = this.filteredEntries(category.entries);
@@ -304,31 +277,6 @@ export class SharedOverviewController {
     }
 
     if (!hasItems) this.renderEmpty();
-  }
-
-  renderFocusSummary() {
-    const rows = this.categories.flatMap((category) => itemsWithSection(category));
-    const urgent = rows.filter(isUrgent).length;
-    const recent = rows.filter(isRecent).length;
-    const total = rows.length;
-
-    const summary = document.createElement("div");
-    summary.className = "focus-summary";
-    summary.innerHTML = `
-      <button type="button" class="focus-chip focus-chip-urgent">
-        <span class="focus-value">${urgent}</span>
-        <span class="focus-label">urgent</span>
-      </button>
-      <button type="button" class="focus-chip focus-chip-recent">
-        <span class="focus-value">${recent}</span>
-        <span class="focus-label">recent</span>
-      </button>
-      <button type="button" class="focus-chip focus-chip-all active">
-        <span class="focus-value">${total}</span>
-        <span class="focus-label">open</span>
-      </button>
-    `;
-    this.elements.content.appendChild(summary);
   }
 
   renderEmpty() {
