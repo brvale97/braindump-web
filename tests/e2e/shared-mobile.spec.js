@@ -57,6 +57,8 @@ test.describe("Anna/Bram mobile overview", () => {
     await expect(page.locator(".focus-summary")).toBeHidden();
     await expect(page.locator(".overview-header-item", { hasText: "Urgent" })).toBeHidden();
     await expect(page.locator(".overview-header-item", { hasText: "Binnenkort" })).toBeHidden();
+    await expect(row.locator(".item-date")).toHaveCount(0);
+    await expect(row).not.toContainText("27-04-2026");
 
     const [circleBox, textBox, composerBox] = await Promise.all([
       circle.boundingBox(),

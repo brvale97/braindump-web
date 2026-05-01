@@ -6,7 +6,7 @@ import {
   state,
 } from "./state.js";
 import { apiFetch } from "./api.js";
-import { escapeHtml, formatTimestamp, renderMarkdown, showToast, toProxyUrl } from "./ui.js";
+import { escapeHtml, renderMarkdown, showToast, toProxyUrl } from "./ui.js";
 
 const gripSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>';
 
@@ -332,9 +332,6 @@ export class SharedOverviewController {
       const main = document.createElement("span");
       main.className = "item-main";
       main.innerHTML = renderMarkdown(entry.text, toProxyUrl);
-      if (entry.timestamp) {
-        main.innerHTML += ` <span class="item-date">&middot; ${escapeHtml(formatTimestamp(entry.timestamp))}</span>`;
-      }
       textWrap.appendChild(main);
 
       const contexts = document.createElement("div");
@@ -342,7 +339,7 @@ export class SharedOverviewController {
       (entry.contexts || []).forEach((context) => {
         const node = document.createElement("div");
         node.className = "inbox-context";
-        node.innerHTML = `${escapeHtml(context.text)}${context.timestamp ? ` <span class="timestamp">${escapeHtml(formatTimestamp(context.timestamp))}</span>` : ""}`;
+        node.innerHTML = escapeHtml(context.text);
         contexts.appendChild(node);
       });
       textWrap.appendChild(contexts);
