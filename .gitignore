@@ -2,3 +2,5 @@ node_modules/
 .dev.vars
 .wrangler/
 test-results/
+
+.tmp-preview-*.log
